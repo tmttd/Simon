@@ -117,7 +117,7 @@ def IOB_calculator(boluses:list) -> float:
             dose = int(bolus.get('recent_bolus'))
 
             # IOB = dose * (0.5 ** (minutes_ago / 120.0))
-            IOB = dose * max(0, 1 - (minutes_ago / 300.0))
+            IOB = dose * max(0, 1 - (minutes_ago / 265.0))
             total_IOB += IOB
 
     # 계산된 총 IOB를 소수점 두 자리까지 반올림하여 반환합니다.
