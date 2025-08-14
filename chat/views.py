@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .ai_connector import get_ai_response
+from .models import ChatMessage
 import json
 
 @csrf_exempt
@@ -14,14 +15,28 @@ def chat_with_agent(request) -> JsonResponse:
             user_message = data.get('message')
 
             # 대화의 식별 id인 thread_id를 생성합니다.
-            thread_id = data.get('thread_id', 'test')
+            thread_id = data.get('thread_id', 'test_1')
 
             # 필수 값이 없는 경우 오류를 반환합니다.
             if not user_message:
                 return JsonResponse('error', '사용자 메세지가 누락되었습니다.', status=400)
 
-            # ai의 응답을 반환합니다. 여기서는 테스트 목적으로 동일한 문구만 출력됩니다.
+            # DB에 사용자 메세지를 저장합니다.
+            ChatMessage.objects.create(
+                thread_id=thread_id,
+                sender='user',
+                message=user_message,
+            )
+
+            # ai의 응답을 반환합니다.
             ai_response = get_ai_response(user_message, thread_id)
+
+            # DB에 AI 메세지를 저장합니다.
+            ChatMessage.objects.create(
+                thread_id=thread_id,
+                sender='ai',
+                message=ai_response
+            )
 
             return JsonResponse({'response': ai_response})
         

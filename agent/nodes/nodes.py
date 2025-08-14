@@ -1,4 +1,4 @@
-from typing import TypedDict, Sequence, Annotated, Optional
+from typing import TypedDict, Sequence, Annotated, Optional, Literal
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -33,6 +33,9 @@ class AgentState(TypedDict):
 
     # 최종 계산된 인슐린
     calculation_result: Optional[str]
+
+    # 정보 수집 상태
+    information_state: Optional[Literal["complete", "ongoing"]]
 
     # 음식 영양 성분
     nutrition_facts: Optional[dict]
@@ -93,7 +96,11 @@ def call_information_agent(state:AgentState):
         "messages": state['messages']
     })
 
-    return {"messages": [output]}
+    if "완료" in output.content:
+        return {"information_state": "complete", "messages": [output]}
+    
+    else:
+        return {"messages": [output]}
 
 # 정보 수집 루프를 계속할지 결정하는 함수
 # workflow.py에서 conditional_edge에 사용됩니다.
@@ -101,10 +108,11 @@ def continue_information_gathering(state:AgentState) -> str:
     last_message = state['messages'][-1]
 
     # 도구를 호출했다면 당연히 한 번 더 진행.
-    if last_message.tool_calls:
+    # AIMessage인지 확인하고 tool_calls가 있는지 확인
+    if isinstance(last_message, AIMessage) and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         return "nutrition"
     
-    if "complete" in last_message.content:
+    elif state.get('information_state') == "complete":
         return "complete"
     
     else:
@@ -191,6 +199,10 @@ def call_answering_agent(state:AgentState) -> dict:
 def call_nutirion_agent(state:AgentState):
 
     last_message = state['messages'][-1]
+
+    # AIMessage이고 tool_calls가 있는지 확인
+    if not isinstance(last_message, AIMessage) or not hasattr(last_message, 'tool_calls') or not last_message.tool_calls:
+        raise ValueError("Expected AIMessage with tool_calls")
 
     tool_args = last_message.tool_calls[0]['args']
 

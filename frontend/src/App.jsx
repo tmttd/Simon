@@ -57,13 +57,13 @@ function App() {
             <p>{msg.text}</p>
           </div>
         ))}
-      </div>
+      </div>  
       <div className="input-area">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
         />
         <button onClick={sendMessage}>전송</button>
       </div>
