@@ -18,7 +18,7 @@ TARGET = 120
 
 
 # Documnet Retriever 구성 정보
-PERSIST_DIRECTORY = 'C:/Users/pqstv/bluetorch/insuLin_Guide/agent/chroma_db'
+PERSIST_DIRECTORY = 'C:/Users/pqstv/bluetorch/insuLin_Guide/backend/agent/chroma_db'
 COLLECTION_NAME = 'nutrition_facts'
 QUERY_EMBEDDING_MODEL_NAME = 'solar-embedding-1-large-query'
 DOCUMENT_EMBEDDING_MODEL_NAME = 'solar-embedding-1-large-passage'

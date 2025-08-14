@@ -46,3 +46,26 @@ def chat_with_agent(request) -> JsonResponse:
             return JsonResponse({'error', f'서버 내부 오류 {e}'}, status=500)
 
     return JsonResponse({'error': 'POST요청만 지원합니다.'}, status=405)
+
+@csrf_exempt
+def get_chat_history(request, thread_id):
+    """클라이언트로부터 전송된 thread_id를 바탕으로 
+    chatMessage객체의 List를 DB에서 찾아 JSON 형태로 반환합니다."""
+
+    if request.method == "GET":
+        try:
+            # DB에서 해당 thread_id에 해당하는 모든 객체를 추출하기.
+            messages = ChatMessage.objects.filter(thread_id=thread_id).order_by('timestamp')
+            
+            # 프론트엔드(React)에서 활용할 수 있도록 Dictionary의 List로 만들기
+            history = [
+                {'sender': msg.sender,
+                'text': msg.message}
+                for msg in messages
+            ]
+
+            return JsonResponse({'history': history})
+        except Exception as e:
+            return JsonResponse({'error': f'서버 내부 오류: {str(e)}'}, status=500)
+    else:
+        return JsonResponse({'error': "GET 요청만 지원하는 엔드포인트입니다."}, status=405)

@@ -1,11 +1,38 @@
 // insuLin_Guide/frontend/src/App.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css'; // 기본 CSS도 곧 수정할 예정입니다.
 
 function App() {
   const [messages, setMessages] = useState([]); // 대화 기록을 저장할 배열
   const [input, setInput] = useState(''); // 사용자의 현재 입력 값을 저장
+
+  const THREAD_ID = 'test-thread-react';
+
+  useEffect(() => {
+    const fetchHistory= async () => {
+      try {
+        const response = await fetch(`/api/chat/history/${THREAD_ID}/`);
+      
+        if (!response.ok) {
+          throw new Error(`HTTP Error! status: ${response.status}`);
+        }
+        
+        console.log(`response: ${response.status}`)
+
+        const data = await response.json();
+
+        console.log(`data: ${data.history}`)
+        // DB에서 가져온 history를 가지고 messages를 구성합니다.
+        setMessages(data.history);
+      } catch (error) {
+        console.error('대화 기록 로딩 실패', error);
+      }
+    };
+
+    fetchHistory();
+
+  }, [THREAD_ID]);
 
   // 메시지를 보내는 함수
   const sendMessage = async () => {
@@ -14,11 +41,12 @@ function App() {
     // 사용자의 메시지를 대화 기록에 추가
     const userMessage = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
+    setInput('')
 
     // 여기서 실제 API를 호출합니다.
     try {
       // Django 백엔드 API 주소 (포트 8000번)
-      const response = await fetch('http://localhost:8000/chat/ask/', {
+      const response = await fetch('/api/chat/ask/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,8 +73,6 @@ function App() {
       const errorMessage = { sender: 'ai', text: '죄송합니다. 서버와 통신 중 오류가 발생했습니다.' };
       setMessages(prev => [...prev, errorMessage]);
     }
-
-    setInput(''); // 입력창 비우기
   };
 
   return (

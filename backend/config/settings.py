@@ -87,7 +87,7 @@ DATABASES = {
         'NAME': 'insuLin_Guide_db',
         'USER': 'insuLin_Guide_user',
         'PASSWORD': PASSWORD,
-        'HOST': 'localhost',
+        'HOST': 'db',
         'PORT': '5432'
     }
 }
