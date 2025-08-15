@@ -1,4 +1,3 @@
 # insuLin_Guide/backend/.dockerignore
-.env
 __pycache__/
 *.pyc
