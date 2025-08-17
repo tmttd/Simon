@@ -1,6 +1,4 @@
-# insuLin_Guide/docker-compose.yml
-version: '3.8'
-
+# Simon/docker-compose.yml
 services:
   db:
     image: postgres:17
