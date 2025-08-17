@@ -38,6 +38,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Nginx 설정 파일 연결
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+      # Let's Encrypt 인증서 파일들을 컨테이너 내부로 연결
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Let's Encrypt 갱신용 폴더 연결
+      - /var/www/certbot:/var/www/certbot
     depends_on:
       - backend
     restart: always

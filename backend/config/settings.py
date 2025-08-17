@@ -28,8 +28,12 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['64.176.224.167',
+                 'localhost',
+                 '127.0.0.1',
+                 'simon.ai.kr',
+                 'www.simon.ai.kr',
+                ]
 
 # Application definition
 
@@ -133,4 +137,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    'http://64.176.224.167',
+    'http://simon.ai.kr',
+    'http://www.simon.ai.kr',
 ]

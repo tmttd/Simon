@@ -211,3 +211,6 @@ __marimo__/
 chroma_db/
 
 frontend/node_modules/
+
+docker-compose.override.yml
+frontend/nginx.local.conf
