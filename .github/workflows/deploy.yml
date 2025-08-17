@@ -1,0 +1,49 @@
+# .github/workflows/deploy.yml
+
+# 1. 워크플로우의 이름 설정
+name: Deploy to Vultr Server
+
+# 2. 워크플로우가 실행될 조건 설정
+on:
+  push:
+    branches:
+      - main  # 'main' 브랜치에 push 이벤트가 발생했을 때만 실행
+
+# 3. 실제 수행할 작업(Jobs) 정의
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # 이 작업을 실행할 가상 환경의 종류 (최신 우분투)
+
+    # 4. 작업 단계(Steps) 정의
+    steps:
+      # (1) SSH 접속 설정을 위한 단계
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} # GitHub Secrets에서 개인키 가져오기
+
+      # (2) 원격 서버에 접속하여 배포 명령을 실행하는 단계
+      - name: Deploy to Server
+        run: |
+          # SSH 접속 시 호스트 키를 자동으로 신뢰하도록 설정 (최초 접속 질문 방지)
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          
+          # SSH를 통해 원격 서버에 일련의 명령어를 실행
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            # 1. 프로젝트 디렉토리로 이동
+            cd ~/app
+
+            # 2. GitHub에서 최신 소스 코드를 가져오기
+            echo ">>> Pulling latest source code..."
+            git pull
+
+            # 3. Docker Compose로 프로젝트를 다시 빌드하고 백그라운드에서 실행
+            echo ">>> Rebuilding and restarting services..."
+            docker-compose up --build -d
+
+            # 4. 사용되지 않는 구버전 Docker 이미지를 정리하여 디스크 공간 확보
+            echo ">>> Pruning old docker images..."
+            docker image prune -f
+
+            echo ">>> Deployment successful!"
+          EOF
