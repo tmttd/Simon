@@ -214,3 +214,4 @@ frontend/node_modules/
 
 docker-compose.override.yml
 frontend/nginx.local.conf
+postgres_config/
