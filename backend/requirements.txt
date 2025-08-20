@@ -1,6 +1,8 @@
 # Django 웹 프레임워크
 Django==5.2.4
 django-cors-headers==4.7.0
+djangorestframework==3.16.1
+djangorestframework_simplejwt==5.5.1
 uvicorn==0.34.3
 gunicorn==23.0.0
 
