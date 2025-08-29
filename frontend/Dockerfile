@@ -1,4 +1,4 @@
-# insuLin_Guide/Dockerfile.frontend
+# Simon/Dockerfile.frontend
 
 # --- 1단계: 빌드 환경 ---
     FROM node:18-alpine AS builder

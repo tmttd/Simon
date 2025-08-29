@@ -1,100 +1,20 @@
-// insuLin_Guide/frontend/src/App.jsx
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import LoginForm from "./features/auth/LoginForm";
+import ChatWindow from "./features/chat/ChatWindow";
+import ProtectedRoute from "./features/auth/ProtectedRoute";
 
-import React, { useState, useEffect } from 'react';
-import './App.css'; // 기본 CSS도 곧 수정할 예정입니다.
-
-function App() {
-  const [messages, setMessages] = useState([]); // 대화 기록을 저장할 배열
-  const [input, setInput] = useState(''); // 사용자의 현재 입력 값을 저장
-
-  const THREAD_ID = 'test-thread-react';
-
-  useEffect(() => {
-    const fetchHistory= async () => {
-      try {
-        const response = await fetch(`/api/chat/history/${THREAD_ID}/`);
-      
-        if (!response.ok) {
-          throw new Error(`HTTP Error! status: ${response.status}`);
-        }
-        
-        console.log(`response: ${response.status}`)
-
-        const data = await response.json();
-
-        console.log(`data: ${data.history}`)
-        // DB에서 가져온 history를 가지고 messages를 구성합니다.
-        setMessages(data.history);
-      } catch (error) {
-        console.error('대화 기록 로딩 실패', error);
-      }
-    };
-
-    fetchHistory();
-
-  }, [THREAD_ID]);
-
-  // 메시지를 보내는 함수
-  const sendMessage = async () => {
-    if (!input.trim()) return; // 입력이 비어있으면 아무것도 하지 않음
-
-    // 사용자의 메시지를 대화 기록에 추가
-    const userMessage = { sender: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('')
-
-    // 여기서 실제 API를 호출합니다.
-    try {
-      // Django 백엔드 API 주소 (포트 8000번)
-      const response = await fetch('/api/chat/ask/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: input,
-          thread_id: 'test-thread-react', // 우선 고정된 ID 사용
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // AI의 응답을 대화 기록에 추가
-      const aiMessage = { sender: 'ai', text: data.response };
-      setMessages(prev => [...prev, aiMessage]);
-
-    } catch (error) {
-      console.error("API 호출 중 오류 발생:", error);
-      // 에러 메시지를 화면에 표시
-      const errorMessage = { sender: 'ai', text: '죄송합니다. 서버와 통신 중 오류가 발생했습니다.' };
-      setMessages(prev => [...prev, errorMessage]);
-    }
-  };
-
+export default function App() {
   return (
-    <div className="App">
-      <div className="chat-window">
-        {messages.map((msg, index) => (
-          <div key={index} className={`message ${msg.sender}`}>
-            <p>{msg.text}</p>
-          </div>
-        ))}
-      </div>  
-      <div className="input-area">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-        />
-        <button onClick={sendMessage}>전송</button>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginForm />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/chat" element={<ChatWindow />} />
+        </Route>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;

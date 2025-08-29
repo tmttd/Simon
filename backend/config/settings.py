@@ -36,6 +36,7 @@ ALLOWED_HOSTS = ['64.176.224.167',
                  '127.0.0.1',
                  'simon.ai.kr',
                  'www.simon.ai.kr',
+                 'backend',
                 ]
 
 # Application definition
@@ -76,8 +77,8 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
-    "ROTATE_REFRESH_TOKENS": False,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -159,7 +160,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174",
     'http://64.176.224.167',
     'http://simon.ai.kr',
     'http://www.simon.ai.kr',
 ]
+
+CORS_ALLOW_CREDENTIALS = True
