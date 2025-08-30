@@ -1,26 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
-import { me } from "../api/apiClient";
+import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute() {
-  const [ok, setOk] = useState(null); // null=확인중, true=통과, false=차단
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        await me()
-        if (alive) setOk(true); // [G3] 성공 처리
-      } catch (e) {
-        console.log("인증 실패:", e);
-        if (alive) setOk(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  if (isLoading) {
+    return <div style={{ padding: 16 }}>인증 확인 중...</div>;
+  }
 
-  if (ok === null) return <div style={{ padding: 16 }}>인증 중...</div>;
-  if (ok) return <Outlet />;
-  return <Navigate to="/login" replace state={{ from: location }} />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <Outlet />;
 }

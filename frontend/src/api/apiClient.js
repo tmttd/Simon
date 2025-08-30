@@ -1,6 +1,17 @@
 // frontend/lib/apiClient.js
 import axios from "axios";
-import { getAccessToken, setAccessToken, clearAccessToken } from "./tokenStorage";
+
+// --- tokenStorage.js의 기능을 여기로 통합합니다. ---
+let accessToken = null;
+
+const getAccessToken = () => accessToken;
+const setAccessToken = (token) => {
+  accessToken = token;
+};
+const clearAccessToken = () => {
+  accessToken = null;
+};
+// -------------------------------------------------
 
 const BASE_URL = "/api";
 
@@ -85,6 +96,7 @@ api.interceptors.response.use(
 // 3) login 헬퍼에서 access 적용만 보장(쿠키는 서버가 심음)
 export async function login({ email, password }) {
   const res = await api.post("auth/token/", { email, password });
+  setAccessToken(res.data.access);
   return res.data;
 }
 
@@ -94,6 +106,14 @@ export async function me() {
 }
 
 export async function logout() {
-  clearAccessToken();
-  // 서버 revoke는 선택
+  // 서버에 Refresh Token 무효화를 요청합니다.
+  // HttpOnly 쿠키를 보내기 위해 withCredentials를 사용해야 할 수 있습니다.
+  try {
+    await api.post("/auth/logout/", null, { withCredentials: true });
+  } catch (e) {
+    console.error("서버 로그아웃에 실패했습니다.", e);
+  } finally {
+    // 서버 요청 성공 여부와 관계없이 클라이언트 측 토큰은 정리합니다.
+    clearAccessToken();
+  }
 }

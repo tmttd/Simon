@@ -13,7 +13,9 @@
 .header {
   padding: 16px 20px;
   border-bottom: 1px solid #374151; /* 어두운 배경에 맞는 테두리 색상 */
-  /* background 속성은 .window에서 상속받으므로 제거 가능 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .title {
@@ -29,6 +31,23 @@
   font-size: 14px;
 }
 
+.logoutBtn {
+  padding: 8px 12px;
+  border: 1px solid #4b5563;
+  border-radius: var(--radius);
+  background: transparent;
+  color: #f9fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.logoutBtn:hover {
+  background: #374151;
+  border-color: #6b7280;
+}
+
 .main {
   padding: 16px 20px;
   overflow-y: auto;
@@ -39,6 +58,44 @@
 
 .messageList {
   font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  max-width: 80%;
+  word-wrap: break-word;
+  line-height: 1.6;
+}
+
+.userMessage {
+  background: var(--brand);
+  color: #fff;
+  align-self: flex-end;
+  margin-left: auto;
+  border-bottom-right-radius: 2px;
+}
+
+.aiMessage {
+  background: #374151;
+  color: #f9fafb;
+  align-self: flex-start;
+  margin-right: auto;
+  border-bottom-left-radius: 2px;
+}
+
+.aiMessage pre {
+  background-color: #111827;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.aiMessage code {
+  font-family: "Courier New", Courier, monospace;
 }
 
 .form {
