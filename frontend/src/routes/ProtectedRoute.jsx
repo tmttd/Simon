@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
-import { me } from "../../api/apiClient";
+import { me } from "../api/apiClient";
 
 export default function ProtectedRoute() {
   const [ok, setOk] = useState(null); // null=확인중, true=통과, false=차단

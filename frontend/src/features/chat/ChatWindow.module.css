@@ -1,0 +1,91 @@
+/* ChatWindow.module.css */
+
+.window {
+  width: 100%;
+  height: 100vh; /* 화면 전체 높이를 차지하도록 변경 */
+  background: #111827; /* 기본 배경을 어둡게 설정 */
+  color: #f9fafb;      /* 기본 글자색을 밝게 설정 */
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  /* 카드 형태의 스타일(그림자, 둥근 모서리 등) 제거 */
+}
+
+.header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #374151; /* 어두운 배경에 맞는 테두리 색상 */
+  /* background 속성은 .window에서 상속받으므로 제거 가능 */
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  /* color 속성은 .window에서 상속 */
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: #9ca3af; /* 더 밝은 회색으로 변경 */
+  font-size: 14px;
+}
+
+.main {
+  padding: 16px 20px;
+  overflow-y: auto;
+  /* background와 color는 .window에서 상속받으므로 유지 또는 제거 가능 */
+  background: #111827;
+  color: #f9fafb;
+}
+
+.messageList {
+  font-size: 14px;
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+  padding: 12px 12px 16px;
+  border-top: 1px solid #374151; /* 어두운 배경에 맞는 테두리 색상 */
+  /* background-color는 .window에서 상속 */
+}
+
+.input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid #4b5563; /* 다크 모드용 테두리 */
+  outline: none;
+  font-size: 15px;
+  background: #374151; /* 다크 모드용 입력창 배경 */
+  color: #f9fafb;      /* 다크 모드용 입력창 글자색 */
+}
+
+.input::placeholder {
+  color: #9ca3af; /* 플레이스홀더 색상 */
+}
+
+.input:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.submitBtn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 700;
+  background: var(--brand); /* 브랜드 색상으로 되돌립니다. */
+  color: #fff;
+  cursor: pointer;
+  transition: filter .15s ease, opacity .15s ease; /* LoginForm과 통일 */
+  font-size: 15px; /* 이전 오타 수정 */
+}
+
+.submitBtn:hover {
+  filter: brightness(0.92); /* LoginForm과 통일 */
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
