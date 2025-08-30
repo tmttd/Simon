@@ -4,8 +4,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { api, login } from "../../lib/apiClient.js"
-import { setAccessToken } from "../../lib/tokenStorage";
+import { api, login } from "../../api/apiClient.js"
+import { setAccessToken } from "../../api/tokenStorage.js";
 
 // 스키마(검증) - 규칙은 PLACEHOLDER로 남겨둡니다.
 const loginSchema = z.object({
