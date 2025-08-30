@@ -51,7 +51,7 @@ jobs:
             echo ">>> Pulling latest source code..."
             git fetch --all --prune
             git reset --hard origin/main
-            docker compose pull || true
+            git pull || true
 
             echo ">>> Rebuilding and restarting services..."
             docker compose up --build -d
