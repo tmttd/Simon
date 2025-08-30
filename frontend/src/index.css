@@ -1,3 +1,9 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -11,6 +17,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* LoginForm에서 가져온 디자인 토큰 */
+  --brand: #ae4cf0;
+  --radius: 12px;
+  --page-bg: #f6f7fb;
+  --focus-ring: rgba(174, 76, 240, 0.35);
+  --error: #ef4444;
 }
 
 a {
@@ -24,8 +37,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }

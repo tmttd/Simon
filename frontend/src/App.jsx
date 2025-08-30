@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./features/auth/LoginForm";
 import ChatWindow from "./features/chat/ChatWindow";
-import ProtectedRoute from "./features/auth/ProtectedRoute";
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 export default function App() {
   return (

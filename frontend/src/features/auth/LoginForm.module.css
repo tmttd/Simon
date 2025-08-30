@@ -1,0 +1,102 @@
+/* ===== 페이지 레이아웃: PC 화면 중앙 정렬 ===== */
+.page {
+  min-height: 100vh;
+  background: var(--page-bg);
+  /* Flexbox를 사용하여 카드(폼)를 수직/수평 중앙에 배치합니다. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px; /* 화면 가장자리 여백 */
+}
+
+/* ===== 카드(폼) 컨테이너: 너비 고정 ===== */
+.card {
+  /* PC 화면에서 너무 넓어지지 않도록 최대 너비를 설정합니다. */
+  max-width: 480px;
+  width: 100%;
+  text-align: center; /* 카드 내부의 모든 텍스트를 가운데 정렬합니다. */
+
+  background: #fff;
+  color: #111827; /* 카드 내부의 기본 텍스트 색상을 어둡게 설정합니다. */
+  padding: 40px 48px;
+  border-radius: var(--radius);
+  box-shadow: 0 12px 36px rgba(0,0,0,.06);
+}
+
+/* ===== 타이포 ===== */
+.title {
+  margin: 0 0 8px 0;
+  font-size: 28px;       /* [W6] 타이틀 확대 */
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  margin: 0 0 28px 0;    /* [W7] 하단 여백 확대 */
+  color: #6b7280;
+  font-size: 15px;
+}
+
+/* ===== 알림/에러 ===== */
+.alert {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+/* ===== 폼 필드 ===== */
+.label {
+  display: block;
+  font-weight: 700;
+  margin-top: 10px;      /* [W8] 간격 소폭 증가 */
+  text-align: left; /* 레이블은 왼쪽 정렬을 유지합니다. */
+}
+.input {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 6px;
+  padding: 14px 16px;    /* [W9] 입력창 높이 키우기 */
+  border-radius: var(--radius);
+  border: 1px solid #e5e7eb;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+  font-size: 15px;
+  text-align: center; /* 입력 필드의 텍스트를 가운데 정렬합니다. */
+}
+.input:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+.isInvalid {
+  border-color: var(--error);
+  box-shadow: none;
+}
+.errorText {
+  color: var(--error);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ===== 버튼 ===== */
+.submitBtn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px 16px;    /* [W10] 버튼 높이 키우기 */
+  border: none;
+  border-radius: var(--radius);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter .15s ease, opacity .15s ease;
+  font-size: 15px;
+}
+.submitBtn:hover { filter: brightness(0.92); }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ===== (옵션) 2열 레이아웃을 나중에 쓰고 싶다면 대비만 해둠 ===== */
+/* .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } */
+/* .full { grid-column: 1 / -1; } */

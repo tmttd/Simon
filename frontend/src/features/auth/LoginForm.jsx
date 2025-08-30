@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api, login } from "../../api/apiClient.js"
 import { setAccessToken } from "../../api/tokenStorage.js";
+import styles from "./LoginForm.module.css";
 
 // 스키마(검증) - 규칙은 PLACEHOLDER로 남겨둡니다.
 const loginSchema = z.object({
@@ -63,124 +64,58 @@ export default function LoginForm() {
       }
     };
 
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background: "#f6f7fb",
-        padding: "24px",
-      }}
-    >
-      <form
-        noValidate
-        onSubmit={handleSubmit(onSubmit)}
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "#fff",
-          padding: "28px",
-          borderRadius: "16px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-        }}
-      >
-        <h1 style={{ margin: 0, marginBottom: 8, fontSize: 24, fontWeight: 700 }}>
-          Simon-AI 로그인
-        </h1>
-        <p style={{ marginTop: 0, color: "#6b7280", marginBottom: 20 }}>
-          계정에 접속하여 계속 진행하세요.
-        </p>
-
-        {errorMsg && (
-          <div
-            role="alert"
-            style={{
-              background: "#fef2f2",
-              color: "#b91c1c",
-              border: "1px solid #fecaca",
-              borderRadius: 12,
-              padding: "10px 12px",
-              marginBottom: 12,
-              fontSize: 14,
-            }}
+    return (
+      <div className={styles.page}>
+        <form noValidate onSubmit={handleSubmit(onSubmit)} className={styles.card}>
+          <h1 className={styles.title}>Simon-AI 로그인</h1>
+          <p className={styles.subtitle}>계정에 접속하여 계속 진행하세요.</p>
+  
+          {errorMsg && (
+            <div role="alert" className={styles.alert}>{errorMsg}</div>
+          )}
+  
+          <label htmlFor="email" className={styles.label}>이메일</label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            {...register("email")}
+            aria-invalid={!!errors.email}
+            aria-describedby="email-error"
+            className={`${styles.input} ${errors.email ? styles.isInvalid : ""}`}
+          />
+          {errors.email && (
+            <div id="email-error" className={styles.errorText}>
+              {errors.email.message?.toString()}
+            </div>
+          )}
+  
+          <label htmlFor="password" className={styles.label}>비밀번호</label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="********"
+            {...register("password")}
+            aria-invalid={!!errors.password}
+            aria-describedby="password-error"
+            className={`${styles.input} ${errors.password ? styles.isInvalid : ""}`}
+          />
+          {errors.password && (
+            <div id="password-error" className={styles.errorText}>
+              {errors.password.message?.toString()}
+            </div>
+          )}
+  
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={styles.submitBtn}
           >
-            {errorMsg}
-          </div>
-        )}
-
-        <label htmlFor="email" style={{ display: "block", fontWeight: 600 }}>
-          이메일
-        </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          {...register("email")}
-          aria-invalid={!!errors.email}
-          aria-describedby="email-error"
-          style={{
-            width: "100%",
-            marginTop: 6,
-            marginBottom: 4,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-            outline: "none",
-          }}
-        />
-        {errors.email && (
-          <div id="email-error" style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>
-            {errors.email.message?.toString()}
-          </div>
-        )}
-
-        <label htmlFor="password" style={{ display: "block", fontWeight: 600, marginTop: 8 }}>
-          비밀번호
-        </label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          placeholder="********"
-          {...register("password")}
-          aria-invalid={!!errors.password}
-          aria-describedby="password-error"
-          style={{
-            width: "100%",
-            marginTop: 6,
-            marginBottom: 4,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-            outline: "none",
-          }}
-        />
-        {errors.password && (
-          <div id="password-error" style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>
-            {errors.password.message?.toString()}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          style={{
-            width: "100%",
-            marginTop: 12,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "none",
-            background: isSubmitting ? "#9ca3af" : "#111827",
-            color: "#fff",
-            fontWeight: 700,
-            cursor: isSubmitting ? "not-allowed" : "pointer",
-          }}
-        >
-          {isSubmitting ? "로그인 중입니다..." : "로그인"}
-        </button>
-      </form>
-    </div>
-  );
-}
+            {isSubmitting ? "로그인 중입니다..." : "로그인"}
+          </button>
+        </form>
+      </div>
+    );
+  }
