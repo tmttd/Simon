@@ -15,11 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 4. 프로젝트 파일 복사
 COPY . /app/
 
-# entrypoint.sh에 실행 권한 부여
-RUN chmod +x /app/entrypoint.sh
-
 # 5. Gunicorn 실행 (개발 서버가 아닌 실제 서비스용 서버)
 # 포트 8000번을 외부에 노출
 EXPOSE 8000
-ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT [ "sh", "./entrypoint.sh" ]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
