@@ -1,71 +1,73 @@
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+
 from .ai_connector import get_ai_response
 from .models import ChatMessage
-import json
 
-@csrf_exempt
-def chat_with_agent(request) -> JsonResponse:
-    """사용자의 채팅을 body로 담은 POST 요청이 들어오면 ai의 메세지를 반환합니다."""
 
-    if request.method == "POST":
+class ChatAgentView(APIView):
+    """사용자의 채팅 메시지를 받아 AI의 응답을 반환합니다."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs) -> Response:
+        user_message = request.data.get('message')
+        # TODO: thread_id를 사용자 세션이나 다른 방식으로 관리하도록 수정 필요
+        thread_id = request.data.get('thread_id', 'test_1') 
+
+        if not user_message:
+            return Response(
+                {'error': '사용자 메세지가 누락되었습니다.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-            # 요청의 body를 json으로 파싱합니다.
-            data = json.loads(request.body)
-            user_message = data.get('message')
-
-            # 대화의 식별 id인 thread_id를 생성합니다.
-            thread_id = data.get('thread_id', 'test_1')
-
-            # 필수 값이 없는 경우 오류를 반환합니다.
-            if not user_message:
-                return JsonResponse('error', '사용자 메세지가 누락되었습니다.', status=400)
-
-            # DB에 사용자 메세지를 저장합니다.
+            # DB에 사용자 메세지 저장
             ChatMessage.objects.create(
                 thread_id=thread_id,
                 sender='user',
                 message=user_message,
             )
 
-            # ai의 응답을 반환합니다.
+            # AI 응답 가져오기
             ai_response = get_ai_response(user_message, thread_id)
 
-            # DB에 AI 메세지를 저장합니다.
+            # DB에 AI 메세지 저장
             ChatMessage.objects.create(
                 thread_id=thread_id,
                 sender='ai',
                 message=ai_response
             )
 
-            return JsonResponse({'response': ai_response})
+            return Response({'response': ai_response}, status=status.HTTP_200_OK)
         
-        except json.JSONDecodeError:
-            return JsonResponse({'error', '잘못된 JSON 형식입니다.'}, status=400)
         except Exception as e:
-            return JsonResponse({'error', f'서버 내부 오류 {e}'}, status=500)
+            return Response(
+                {'error': f'서버 내부 오류: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-    return JsonResponse({'error': 'POST요청만 지원합니다.'}, status=405)
 
-@csrf_exempt
-def get_chat_history(request, thread_id):
-    """클라이언트로부터 전송된 thread_id를 바탕으로 
-    chatMessage객체의 List를 DB에서 찾아 JSON 형태로 반환합니다."""
+class ChatHistoryView(APIView):
+    """특정 대화(thread)의 전체 대화 기록을 반환합니다."""
+    permission_classes = [IsAuthenticated]
 
-    if request.method == "GET":
+    def get(self, request, thread_id, *args, **kwargs) -> Response:
         try:
-            # DB에서 해당 thread_id에 해당하는 모든 객체를 추출하기.
+            # DB에서 해당 thread_id의 모든 메시지를 시간순으로 조회
             messages = ChatMessage.objects.filter(thread_id=thread_id).order_by('timestamp')
             
-            # 프론트엔드(React)에서 활용할 수 있도록 Dictionary의 List로 만들기
+            # 프론트엔드에서 사용할 형태로 데이터 직렬화
             history = [
-                {'sender': msg.sender,
-                'text': msg.message}
+                {'sender': msg.sender, 'text': msg.message}
                 for msg in messages
             ]
 
-            return JsonResponse({'history': history})
+            return Response({'history': history}, status=status.HTTP_200_OK)
+        
         except Exception as e:
-            return JsonResponse({'error': f'서버 내부 오류: {str(e)}'}, status=500)
-    else:
-        return JsonResponse({'error': "GET 요청만 지원하는 엔드포인트입니다."}, status=405)
+            return Response(
+                {'error': f'서버 내부 오류: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
