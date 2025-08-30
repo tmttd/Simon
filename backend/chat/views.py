@@ -23,8 +23,9 @@ class ChatAgentView(APIView):
             )
 
         try:
-            # DB에 사용자 메세지 저장
+            # DB에 사용자 메세지 저장 (현재 로그인한 user와 연결)
             ChatMessage.objects.create(
+                user=request.user,
                 thread_id=thread_id,
                 sender='user',
                 message=user_message,
@@ -33,8 +34,9 @@ class ChatAgentView(APIView):
             # AI 응답 가져오기
             ai_response = get_ai_response(user_message, thread_id)
 
-            # DB에 AI 메세지 저장
+            # DB에 AI 메세지 저장 (현재 로그인한 user와 연결)
             ChatMessage.objects.create(
+                user=request.user,
                 thread_id=thread_id,
                 sender='ai',
                 message=ai_response
@@ -55,8 +57,11 @@ class ChatHistoryView(APIView):
 
     def get(self, request, thread_id, *args, **kwargs) -> Response:
         try:
-            # DB에서 해당 thread_id의 모든 메시지를 시간순으로 조회
-            messages = ChatMessage.objects.filter(thread_id=thread_id).order_by('timestamp')
+            # 현재 로그인한 사용자의 메시지만 조회하도록 user 필터 추가
+            messages = ChatMessage.objects.filter(
+                user=request.user,
+                thread_id=thread_id
+            ).order_by('timestamp')
             
             # 프론트엔드에서 사용할 형태로 데이터 직렬화
             history = [
