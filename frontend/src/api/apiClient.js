@@ -83,8 +83,8 @@ api.interceptors.response.use(
 );
 
 // 3) login 헬퍼에서 access 적용만 보장(쿠키는 서버가 심음)
-export async function login({ username, password }) {
-  const res = await api.post("auth/token/", { username, password });
+export async function login({ email, password }) {
+  const res = await api.post("auth/token/", { email, password });
   return res.data;
 }
 

@@ -9,7 +9,7 @@ import { setAccessToken } from "../../api/tokenStorage.js";
 
 // 스키마(검증) - 규칙은 PLACEHOLDER로 남겨둡니다.
 const loginSchema = z.object({
-  email: z.string().min(1, "유효한 이메일을 입력하세요."),
+  email: z.string().email("유효한 이메일을 입력하세요."),
   password: z.string().min(8, "8자 이상 입력하세요."),
 });
 
@@ -37,7 +37,7 @@ export default function LoginForm() {
     setErrorMsg("");
     try {
         // [L2] 요청 페이로드 매핑 (백엔드가 기대하는 키 이름으로)
-        const payload = { username: values.email, password: values.password };
+        const payload = { email: values.email, password: values.password };
   
         // [L3] 로그인 요청 (리프레시 쿠키는 서버가 Set-Cookie로 내려줌)
         const res = await login(payload);

@@ -26,7 +26,7 @@ def set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     """ 엔드포인트: api/auth/token 
-        username: <사용자 이름>, password: <비밀번호>가 body로 요청되면
+        email: <이메일>, password: <비밀번호>가 body로 요청되면
         access 토큰을 body에 넣어서 보내주고, refresh 토큰(HttpOnly)은 Set-Cookie를 통해 헤더로 보낸다.
     """
     permission_classes = [AllowAny]
