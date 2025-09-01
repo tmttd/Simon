@@ -238,10 +238,17 @@
   justify-content: center;
   align-items: center;
   gap: 24px;
+  position: relative; /* 자식 요소의 absolute positioning 기준 */
+}
+
+.initialLogoutBtn {
+  position: absolute;
+  top: 16px;
+  right: 20px;
 }
 
 .window.initialLayout .welcome {
-  margin: 0;
+  margin: 0; /* 이전 margin: auto를 제거하여 flex 중앙 정렬이 적용되도록 합니다. */
   padding: 0;
 }
 
