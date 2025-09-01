@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Min
 
 from .ai_connector import get_ai_response
 from .models import ChatMessage
@@ -71,6 +72,42 @@ class ChatHistoryView(APIView):
 
             return Response({'history': history}, status=status.HTTP_200_OK)
         
+        except Exception as e:
+            return Response(
+                {'error': f'서버 내부 오류: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ThreadListView(APIView):
+    """현재 로그인한 사용자의 모든 대화(thread) 목록을 반환합니다."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs) -> Response:
+        try:
+            # 1. 현재 사용자의 메시지 중 삭제되지 않은 것만 필터링합니다.
+            # 2. `thread_id`로 그룹화하고, 각 그룹의 첫 메시지 시간(Min('timestamp'))을 계산합니다.
+            # 3. 첫 메시지 시간을 기준으로 최신순(-first_message_time)으로 정렬합니다.
+            # 4. 정렬된 순서대로 `thread_id` 값만 가져옵니다.
+            threads_query = ChatMessage.objects.filter(
+                user=request.user,
+                is_deleted=False
+            ).values('thread_id').annotate(
+                first_message_time=Min('timestamp')
+            ).order_by('-first_message_time').values_list('thread_id', flat=True)
+            
+            # 2. 각 thread_id를 순회하며 제목을 부여합니다.
+            threads = []
+            # 전체 스레드 수를 기반으로 역순으로 번호를 매깁니다.
+            total_threads = len(threads_query)
+            for i, thread_id in enumerate(threads_query):
+                threads.append({
+                    'id': thread_id,
+                    'title': f'대화 {total_threads - i}'
+                })
+
+            return Response(threads, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response(
                 {'error': f'서버 내부 오류: {str(e)}'}, 
