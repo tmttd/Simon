@@ -12,10 +12,11 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const requestStartTimeRef = useRef(null);
 
   const isNewChat = !threadId;
 
@@ -54,17 +55,18 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   }, [messages, isLoading, error]);
 
   useEffect(() => {
-    let timer;
-    if (isLoading) {
-      timer = setInterval(() => {
-        setElapsedTime((prevTime) => prevTime + 0.1);
-      }, 100);
-    } else {
-      setElapsedTime(0);
-    }
+    if (!isLoading) return;
+
+    let frameId;
+    const frame = () => {
+      setNow(Date.now());
+      frameId = requestAnimationFrame(frame);
+    };
+
+    frameId = requestAnimationFrame(frame);
 
     return () => {
-      clearInterval(timer);
+      cancelAnimationFrame(frameId);
     };
   }, [isLoading]);
 
@@ -72,6 +74,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
     setIsLoading(true);
     setError(null);
     abortControllerRef.current = new AbortController();
+    requestStartTimeRef.current = Date.now();
 
     const newThreadId = isNewChat ? uuidv4() : currentThreadId;
 
@@ -92,7 +95,12 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
       }
 
       if (response.data && response.data.response) {
-        const aiMessage = { sender: "ai", text: response.data.response };
+        const duration = (Date.now() - requestStartTimeRef.current) / 1000;
+        const aiMessage = {
+          sender: "ai",
+          text: response.data.response,
+          duration: duration,
+        };
         setMessages((prev) => [...prev, aiMessage]);
       }
     } catch (err) {
@@ -199,13 +207,20 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {msg.text}
               </ReactMarkdown>
+              {msg.duration && (
+                <div className={styles.timer}>
+                  {msg.duration.toFixed(1)}s
+                </div>
+              )}
             </div>
           ))}
-          {isLoading && (
+          {isLoading && requestStartTimeRef.current && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
               <div className={styles.loadingContainer}>
                 <div className={styles.spinner}></div>
-                <div className={styles.timer}>{elapsedTime.toFixed(1)}s</div>
+                <div className={styles.timer}>
+                  {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
+                </div>
               </div>
             </div>
           )}
