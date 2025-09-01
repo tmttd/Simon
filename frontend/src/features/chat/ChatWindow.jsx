@@ -12,6 +12,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false); // 스트리밍 상태 추가
   const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
   const mainRef = useRef(null);
@@ -72,6 +73,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
   const executeSend = async (messageText, currentThreadId) => {
     setIsLoading(true);
+    setIsStreaming(true);
     setError(null);
     abortControllerRef.current = new AbortController();
     requestStartTimeRef.current = Date.now();
@@ -96,12 +98,17 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
       if (response.data && response.data.response) {
         const duration = (Date.now() - requestStartTimeRef.current) / 1000;
+        
+        // AI 메시지를 미리 추가 (타이핑 애니메이션용)
         const aiMessage = {
           sender: "ai",
-          text: response.data.response,
-          duration: duration,
+          text: "",
+          duration: 0,
         };
         setMessages((prev) => [...prev, aiMessage]);
+
+        // 타이핑 애니메이션 시작
+        await typeMessage(response.data.response, duration);
       }
     } catch (err) {
       if (err.name === "CanceledError") {
@@ -112,10 +119,54 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
           message: "메시지 전송 중 오류가 발생했습니다.",
           originalText: messageText,
         });
+        // 실패한 AI 메시지 제거
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage && lastMessage.sender === "ai" && !lastMessage.text) {
+            newMessages.pop();
+          }
+          return newMessages;
+        });
       }
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
       abortControllerRef.current = null;
+    }
+  };
+
+  // 타이핑 애니메이션 함수
+  const typeMessage = async (fullText, duration) => {
+    const chars = fullText.split('');
+    const delay = Math.max(10, Math.min(100, 2000 / chars.length)); // 10-100ms 사이로 조절
+    
+    for (let i = 0; i <= chars.length; i++) {
+      if (abortControllerRef.current?.signal.aborted) {
+        break; // 중단된 경우 타이핑 중지
+      }
+      
+      const currentText = chars.slice(0, i).join('');
+      // 타이핑 중일 때는 커서를 텍스트에 직접 포함
+      const displayText = i < chars.length ? currentText + '▋' : currentText;
+      
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.sender === "ai") {
+          lastMessage.text = displayText;
+          lastMessage.isTyping = i < chars.length; // 타이핑 상태 추가
+          if (i === chars.length) {
+            lastMessage.duration = duration; // 타이핑 완료 시 duration 설정
+            lastMessage.isTyping = false;
+          }
+        }
+        return newMessages;
+      });
+      
+      if (i < chars.length) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   };
 
@@ -221,14 +272,14 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {msg.text}
               </ReactMarkdown>
-              {msg.sender === "ai" && msg.duration && (
+              {msg.sender === "ai" && msg.duration > 0 && !msg.isTyping && (
                 <div className={styles.timer}>
                   {msg.duration.toFixed(1)}s
                 </div>
               )}
             </div>
           ))}
-          {isLoading && requestStartTimeRef.current && (
+          {isLoading && !isStreaming && requestStartTimeRef.current && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
               <div className={styles.loadingContainer}>
                 <div className={styles.spinner}></div>

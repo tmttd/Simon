@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
 from .ai_connector import get_ai_response
 from .models import ChatMessage, Thread
 
@@ -137,3 +136,5 @@ class ThreadDetailView(APIView):
         thread.is_deleted = True
         thread.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
