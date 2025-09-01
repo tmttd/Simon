@@ -51,6 +51,7 @@ class ChatMessage(models.Model):
 
     # 삭제 여부 (Soft Delete)
     is_deleted = models.BooleanField(default=False)
+    duration = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"[{self.timestamp.strftime('%Y-%m-%d %H-%M')}] {self.sender}: {self.message[:30]}"

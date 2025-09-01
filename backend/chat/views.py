@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from .ai_connector import get_ai_response
 from .models import ChatMessage, Thread
@@ -42,13 +43,17 @@ class ChatAgentView(APIView):
                 message=user_message,
             )
 
+            start_time = timezone.now()
             ai_response = get_ai_response(user_message, str(thread.id))
+            end_time = timezone.now()
+            response_duration = (end_time - start_time).total_seconds()
 
             ChatMessage.objects.create(
                 user=request.user,
                 thread=thread,
                 sender='ai',
-                message=ai_response
+                message=ai_response,
+                duration=response_duration
             )
 
             return Response({
@@ -76,7 +81,7 @@ class ChatHistoryView(APIView):
             ).order_by('timestamp')
             
             history = [
-                {'sender': msg.sender, 'text': msg.message, 'duration': 0} # duration 필드 추가
+                {'sender': msg.sender, 'text': msg.message, 'duration': msg.duration if msg.duration is not None else 0}
                 for msg in messages
             ]
 

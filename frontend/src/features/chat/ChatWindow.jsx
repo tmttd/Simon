@@ -96,7 +96,6 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
       if (response.data && response.data.response) {
         const duration = (Date.now() - requestStartTimeRef.current) / 1000;
-        console.log("AI 응답 시간 (초):", duration);
         const aiMessage = {
           sender: "ai",
           text: response.data.response,
