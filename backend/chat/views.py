@@ -2,10 +2,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Min
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from .ai_connector import get_ai_response
-from .models import ChatMessage
+from .models import ChatMessage, Thread
 
 
 class ChatAgentView(APIView):
@@ -14,8 +15,7 @@ class ChatAgentView(APIView):
 
     def post(self, request, *args, **kwargs) -> Response:
         user_message = request.data.get('message')
-        # TODO: thread_id를 사용자 세션이나 다른 방식으로 관리하도록 수정 필요
-        thread_id = request.data.get('thread_id', 'test_1') 
+        thread_id = request.data.get('thread_id')
 
         if not user_message:
             return Response(
@@ -24,26 +24,42 @@ class ChatAgentView(APIView):
             )
 
         try:
-            # DB에 사용자 메세지 저장 (현재 로그인한 user와 연결)
+            if thread_id:
+                thread, created = Thread.objects.get_or_create(
+                    id=thread_id,
+                    defaults={'user': request.user, 'title': user_message[:20]}
+                )
+                if not created and thread.user != request.user:
+                    return Response({'error': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                # 새 대화: 첫 메시지의 일부를 제목으로 사용
+                title = user_message[:20] 
+                thread = Thread.objects.create(user=request.user, title=title)
+
             ChatMessage.objects.create(
                 user=request.user,
-                thread_id=thread_id,
+                thread=thread,
                 sender='user',
                 message=user_message,
             )
 
-            # AI 응답 가져오기
-            ai_response = get_ai_response(user_message, thread_id)
+            start_time = timezone.now()
+            ai_response = get_ai_response(user_message, str(thread.id))
+            end_time = timezone.now()
+            response_duration = (end_time - start_time).total_seconds()
 
-            # DB에 AI 메세지 저장 (현재 로그인한 user와 연결)
             ChatMessage.objects.create(
                 user=request.user,
-                thread_id=thread_id,
+                thread=thread,
                 sender='ai',
-                message=ai_response
+                message=ai_response,
+                duration=response_duration
             )
 
-            return Response({'response': ai_response}, status=status.HTTP_200_OK)
+            return Response({
+                'response': ai_response,
+                'thread_id': thread.id # 새 대화인 경우 thread_id 반환
+            }, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response(
@@ -58,15 +74,14 @@ class ChatHistoryView(APIView):
 
     def get(self, request, thread_id, *args, **kwargs) -> Response:
         try:
-            # 현재 로그인한 사용자의 메시지만 조회하도록 user 필터 추가
+            # Foreign Key 관계를 통해 메시지 조회
             messages = ChatMessage.objects.filter(
                 user=request.user,
-                thread_id=thread_id
+                thread__id=thread_id
             ).order_by('timestamp')
             
-            # 프론트엔드에서 사용할 형태로 데이터 직렬화
             history = [
-                {'sender': msg.sender, 'text': msg.message}
+                {'sender': msg.sender, 'text': msg.message, 'duration': msg.duration if msg.duration is not None else 0}
                 for msg in messages
             ]
 
@@ -85,31 +100,40 @@ class ThreadListView(APIView):
 
     def get(self, request, *args, **kwargs) -> Response:
         try:
-            # 1. 현재 사용자의 메시지 중 삭제되지 않은 것만 필터링합니다.
-            # 2. `thread_id`로 그룹화하고, 각 그룹의 첫 메시지 시간(Min('timestamp'))을 계산합니다.
-            # 3. 첫 메시지 시간을 기준으로 최신순(-first_message_time)으로 정렬합니다.
-            # 4. 정렬된 순서대로 `thread_id` 값만 가져옵니다.
-            threads_query = ChatMessage.objects.filter(
-                user=request.user,
+            threads = Thread.objects.filter(
+                user=request.user, 
                 is_deleted=False
-            ).values('thread_id').annotate(
-                first_message_time=Min('timestamp')
-            ).order_by('-first_message_time').values_list('thread_id', flat=True)
-            
-            # 2. 각 thread_id를 순회하며 제목을 부여합니다.
-            threads = []
-            # 전체 스레드 수를 기반으로 역순으로 번호를 매깁니다.
-            total_threads = len(threads_query)
-            for i, thread_id in enumerate(threads_query):
-                threads.append({
-                    'id': thread_id,
-                    'title': f'대화 {total_threads - i}'
-                })
+            ).values('id', 'title').order_by('-updated_at')
 
-            return Response(threads, status=status.HTTP_200_OK)
+            return Response(list(threads), status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
                 {'error': f'서버 내부 오류: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class ThreadDetailView(APIView):
+    """특정 대화(thread)를 수정하거나 삭제합니다."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, thread_id, *args, **kwargs) -> Response:
+        """대화 제목을 수정합니다."""
+        thread = get_object_or_404(Thread, id=thread_id, user=request.user)
+        new_title = request.data.get('title')
+        if not new_title:
+            return Response(
+                {'error': '제목이 누락되었습니다.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        thread.title = new_title
+        thread.save()
+        return Response({'id': thread.id, 'title': thread.title}, status=status.HTTP_200_OK)
+
+    def delete(self, request, thread_id, *args, **kwargs) -> Response:
+        """대화를 삭제 처리(soft delete)합니다."""
+        thread = get_object_or_404(Thread, id=thread_id, user=request.user)
+        thread.is_deleted = True
+        thread.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
