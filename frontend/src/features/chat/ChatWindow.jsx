@@ -12,6 +12,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [error, setError] = useState(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -51,6 +52,21 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
       mainRef.current.scrollTop = mainRef.current.scrollHeight;
     }
   }, [messages, isLoading, error]);
+
+  useEffect(() => {
+    let timer;
+    if (isLoading) {
+      timer = setInterval(() => {
+        setElapsedTime((prevTime) => prevTime + 0.1);
+      }, 100);
+    } else {
+      setElapsedTime(0);
+    }
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isLoading]);
 
   const executeSend = async (messageText, currentThreadId) => {
     setIsLoading(true);
@@ -187,7 +203,10 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
           ))}
           {isLoading && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
-              <div className={styles.spinner}></div>
+              <div className={styles.loadingContainer}>
+                <div className={styles.spinner}></div>
+                <div className={styles.timer}>{elapsedTime.toFixed(1)}s</div>
+              </div>
             </div>
           )}
           {error && (
