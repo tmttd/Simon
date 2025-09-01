@@ -1,11 +1,26 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 import styles from "./ChatPage.module.css";
+import { api as apiClient } from "../../api/apiClient";
 
 export default function ChatPage() {
+  const [threads, setThreads] = useState([]);
   const [currentThreadId, setCurrentThreadId] = useState(null);
-  const [sidebarKey, setSidebarKey] = useState(Date.now()); // 사이드바 새로고침을 위한 key
+
+  const fetchThreads = useCallback(async () => {
+    try {
+      const response = await apiClient.get("/chat/threads/");
+      setThreads(response.data);
+    } catch (err) {
+      console.error("대화 목록 조회 실패:", err);
+      // 사용자에게 에러 알림 처리 추가 가능
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchThreads();
+  }, [fetchThreads]);
 
   const handleSelectThread = (threadId) => {
     setCurrentThreadId(threadId);
@@ -15,23 +30,25 @@ export default function ChatPage() {
     setCurrentThreadId(null);
   };
 
-  // 새 대화가 시작되었을 때 호출될 콜백
-  const onNewThreadStart = useCallback((newThreadId) => {
-    setCurrentThreadId(newThreadId);
-    // 사이드바를 강제로 다시 렌더링하여 새 대화 목록을 불러오도록 함
-    setSidebarKey(Date.now());
-  }, []);
+  const onNewThreadStart = useCallback(
+    (newThreadId) => {
+      fetchThreads(); // 새 스레드가 생성되면 목록을 다시 불러옵니다.
+      setCurrentThreadId(newThreadId);
+    },
+    [fetchThreads]
+  );
 
   return (
     <div className={styles.chatPage}>
       <Sidebar
-        key={sidebarKey}
+        threads={threads}
+        setThreads={setThreads}
         selectedThreadId={currentThreadId}
         onSelectThread={handleSelectThread}
         onNewChat={handleNewChat}
       />
       <ChatWindow
-        key={currentThreadId} // threadId가 변경될 때마다 ChatWindow를 리마운트
+        key={currentThreadId}
         threadId={currentThreadId}
         onNewThreadStart={onNewThreadStart}
       />
