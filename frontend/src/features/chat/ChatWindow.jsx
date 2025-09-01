@@ -170,6 +170,12 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   if (isInitialView) {
     return (
       <div className={`${styles.window} ${styles.initialLayout}`}>
+        <button
+          onClick={logout}
+          className={`${styles.logoutBtn} ${styles.initialLogoutBtn}`}
+        >
+          로그아웃
+        </button>
         <div className={styles.welcome}>
           <h1 className={styles.title}>Simon says</h1>
           <p className={styles.subtitle}>무엇이든 물어보세요!</p>
