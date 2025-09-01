@@ -55,6 +55,7 @@ jobs:
 
             echo ">>> Rebuilding and restarting services..."
             docker compose up --build -d
+            docker compose restart frontend
 
             echo ">>> Pruning old docker images..."
             docker image prune -f

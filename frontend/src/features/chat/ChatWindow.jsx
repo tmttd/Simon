@@ -142,7 +142,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   // 타이핑 애니메이션 함수
   const typeMessage = async (fullText, duration) => {
     const chars = fullText.split('');
-    const TYPING_SPEED = 8; // 초당 글자 수 (원하는 속도로 조절 가능)
+    const TYPING_SPEED = 4; // 초당 글자 수 (원하는 속도로 조절 가능)
     const delay = 1000 / TYPING_SPEED; // 각 글자 간격 (ms)
     
     for (let i = 0; i <= chars.length; i++) {
