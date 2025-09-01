@@ -12,6 +12,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false); // 스트리밍 상태 추가
   const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
   const mainRef = useRef(null);
@@ -72,6 +73,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
   const executeSend = async (messageText, currentThreadId) => {
     setIsLoading(true);
+    setIsStreaming(false); // 처음에는 로딩 상태 유지
     setError(null);
     abortControllerRef.current = new AbortController();
     requestStartTimeRef.current = Date.now();
@@ -96,12 +98,20 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
       if (response.data && response.data.response) {
         const duration = (Date.now() - requestStartTimeRef.current) / 1000;
+        
+        // API 응답을 받은 후 스트리밍 상태로 변경
+        setIsStreaming(true);
+        
+        // AI 메시지를 미리 추가 (타이핑 애니메이션용)
         const aiMessage = {
           sender: "ai",
-          text: response.data.response,
-          duration: duration,
+          text: "",
+          duration: 0,
         };
         setMessages((prev) => [...prev, aiMessage]);
+
+        // 타이핑 애니메이션 시작
+        await typeMessage(response.data.response, duration);
       }
     } catch (err) {
       if (err.name === "CanceledError") {
@@ -112,10 +122,54 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
           message: "메시지 전송 중 오류가 발생했습니다.",
           originalText: messageText,
         });
+        // 실패한 빈 AI 메시지가 있다면 제거
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage && lastMessage.sender === "ai" && (!lastMessage.text || lastMessage.text === "")) {
+            newMessages.pop();
+          }
+          return newMessages;
+        });
       }
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
       abortControllerRef.current = null;
+    }
+  };
+
+  // 타이핑 애니메이션 함수
+  const typeMessage = async (fullText, duration) => {
+    const chars = fullText.split('');
+    const delay = Math.max(10, Math.min(100, 2000 / chars.length)); // 10-100ms 사이로 조절
+    
+    for (let i = 0; i <= chars.length; i++) {
+      if (abortControllerRef.current?.signal.aborted) {
+        break; // 중단된 경우 타이핑 중지
+      }
+      
+      const currentText = chars.slice(0, i).join('');
+      // 타이핑 중일 때는 커서를 텍스트에 직접 포함
+      const displayText = i < chars.length ? currentText + '▋' : currentText;
+      
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.sender === "ai") {
+          lastMessage.text = displayText;
+          lastMessage.isTyping = i < chars.length; // 타이핑 상태 추가
+          if (i === chars.length) {
+            lastMessage.duration = duration; // 타이핑 완료 시 duration 설정
+            lastMessage.isTyping = false;
+          }
+        }
+        return newMessages;
+      });
+      
+      if (i < chars.length) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   };
 
@@ -127,11 +181,42 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
     setMessages((prev) => [...prev, userMessage]);
     executeSend(input, threadId);
     setInput("");
+    // textarea 높이 초기화
+    const textarea = e.target.querySelector('textarea');
+    if (textarea) {
+      textarea.style.height = 'auto';
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+Enter 또는 Cmd+Enter: 전송
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+        
+        const userMessage = { sender: "user", text: input };
+        setMessages((prev) => [...prev, userMessage]);
+        executeSend(input, threadId);
+        setInput("");
+        // textarea 높이 초기화
+        e.target.style.height = 'auto';
+      }
+      // Enter만 누르면: 줄바꿈 (기본 동작)
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    // 자동 높이 조절
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
 
   const handleRetry = () => {
     if (error && error.originalText) {
-      setMessages((prev) => prev.slice(0, -1));
+      // 오류 상태만 초기화하고, 메시지는 executeSend에서 처리
+      setError(null);
       executeSend(error.originalText, threadId);
     }
   };
@@ -144,13 +229,14 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
   const chatForm = (
     <form onSubmit={onSubmit} className={styles.form}>
-      <input
-        type="text"
+      <textarea
         value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="메세지를 입력하세요."
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        placeholder="메세지를 입력하세요. (Ctrl+Enter: 전송)"
         className={styles.input}
         disabled={isLoading}
+        rows={1}
       />
       <button
         type={isLoading ? "button" : "submit"}
@@ -221,14 +307,14 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {msg.text}
               </ReactMarkdown>
-              {msg.sender === "ai" && msg.duration && (
+              {msg.sender === "ai" && msg.duration > 0 && !msg.isTyping && (
                 <div className={styles.timer}>
                   {msg.duration.toFixed(1)}s
                 </div>
               )}
             </div>
           ))}
-          {isLoading && requestStartTimeRef.current && (
+          {isLoading && !isStreaming && requestStartTimeRef.current && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
               <div className={styles.loadingContainer}>
                 <div className={styles.spinner}></div>
