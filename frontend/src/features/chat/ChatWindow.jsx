@@ -122,11 +122,11 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
           message: "메시지 전송 중 오류가 발생했습니다.",
           originalText: messageText,
         });
-        // 실패한 AI 메시지 제거
+        // 실패한 빈 AI 메시지가 있다면 제거
         setMessages((prev) => {
           const newMessages = [...prev];
           const lastMessage = newMessages[newMessages.length - 1];
-          if (lastMessage && lastMessage.sender === "ai" && !lastMessage.text) {
+          if (lastMessage && lastMessage.sender === "ai" && (!lastMessage.text || lastMessage.text === "")) {
             newMessages.pop();
           }
           return newMessages;
@@ -181,11 +181,42 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
     setMessages((prev) => [...prev, userMessage]);
     executeSend(input, threadId);
     setInput("");
+    // textarea 높이 초기화
+    const textarea = e.target.querySelector('textarea');
+    if (textarea) {
+      textarea.style.height = 'auto';
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+Enter 또는 Cmd+Enter: 전송
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+        
+        const userMessage = { sender: "user", text: input };
+        setMessages((prev) => [...prev, userMessage]);
+        executeSend(input, threadId);
+        setInput("");
+        // textarea 높이 초기화
+        e.target.style.height = 'auto';
+      }
+      // Enter만 누르면: 줄바꿈 (기본 동작)
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    // 자동 높이 조절
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
 
   const handleRetry = () => {
     if (error && error.originalText) {
-      setMessages((prev) => prev.slice(0, -1));
+      // 오류 상태만 초기화하고, 메시지는 executeSend에서 처리
+      setError(null);
       executeSend(error.originalText, threadId);
     }
   };
@@ -198,13 +229,14 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
   const chatForm = (
     <form onSubmit={onSubmit} className={styles.form}>
-      <input
-        type="text"
+      <textarea
         value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="메세지를 입력하세요."
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        placeholder="메세지를 입력하세요. (Ctrl+Enter: 전송)"
         className={styles.input}
         disabled={isLoading}
+        rows={1}
       />
       <button
         type={isLoading ? "button" : "submit"}
