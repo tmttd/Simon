@@ -73,7 +73,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
   const executeSend = async (messageText, currentThreadId) => {
     setIsLoading(true);
-    setIsStreaming(true);
+    setIsStreaming(false); // 처음에는 로딩 상태 유지
     setError(null);
     abortControllerRef.current = new AbortController();
     requestStartTimeRef.current = Date.now();
@@ -98,6 +98,9 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
       if (response.data && response.data.response) {
         const duration = (Date.now() - requestStartTimeRef.current) / 1000;
+        
+        // API 응답을 받은 후 스트리밍 상태로 변경
+        setIsStreaming(true);
         
         // AI 메시지를 미리 추가 (타이핑 애니메이션용)
         const aiMessage = {
