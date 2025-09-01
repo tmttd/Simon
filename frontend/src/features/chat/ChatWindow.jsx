@@ -1,69 +1,159 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { v4 as uuidv4 } from "uuid";
 import { api as apiClient } from "../../api/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import styles from "./ChatWindow.module.css";
+import { PaperAirplaneIcon, StopIcon, RetryIcon } from "./icons.jsx";
 
-export default function ChatWindow() {
+export default function ChatWindow({ threadId, onNewThreadStart }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const threadId = "test_1"; // 임시 스레드 ID
-  const mainRef = useRef(null); // Ref 이름을 좀 더 명확하게 변경합니다.
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const mainRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-  // 컴포넌트 마운트 시 채팅 기록 불러오기
+  const isNewChat = !threadId;
+
+  // 초기 렌더링 상태인지 판단 (애니메이션 클래스 적용 기준)
+  const isInitialView = isNewChat && messages.length === 0;
+
   useEffect(() => {
+    if (isNewChat) {
+      setMessages([]);
+      return;
+    }
+
     const fetchHistory = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const response = await apiClient.get(`/chat/history/${threadId}/`);
-        // `history` 키의 값인 배열을 상태로 설정합니다.
         if (response.data && Array.isArray(response.data.history)) {
           setMessages(response.data.history);
         }
       } catch (error) {
         console.error("채팅 기록을 불러오는 데 실패했습니다.", error);
+        setError({ message: "채팅 기록을 불러오는 데 실패했습니다." });
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchHistory();
-  }, [threadId]);
+  }, [threadId, isNewChat]);
 
-  // 메시지 목록이 변경될 때마다 맨 아래로 스크롤합니다.
   useEffect(() => {
     if (mainRef.current) {
       mainRef.current.scrollTop = mainRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading, error]);
 
+  const executeSend = async (messageText, currentThreadId) => {
+    setIsLoading(true);
+    setError(null);
+    abortControllerRef.current = new AbortController();
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    const newThreadId = isNewChat ? uuidv4() : currentThreadId;
 
     try {
-      const response = await apiClient.post("/chat/ask/", {
-        message: input,
-        thread_id: threadId,
-      });
+      const response = await apiClient.post(
+        "/chat/ask/",
+        {
+          message: messageText,
+          thread_id: newThreadId,
+        },
+        {
+          signal: abortControllerRef.current.signal,
+        }
+      );
+
+      if (isNewChat) {
+        onNewThreadStart(newThreadId);
+      }
 
       if (response.data && response.data.response) {
         const aiMessage = { sender: "ai", text: response.data.response };
         setMessages((prev) => [...prev, aiMessage]);
       }
-    } catch (error) {
-      console.error("메시지 전송에 실패했습니다.", error);
-      const errorMessage = {
-        sender: "ai",
-        text: "메시지 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+    } catch (err) {
+      if (err.name === "CanceledError") {
+        console.log("Request canceled by user.");
+      } else {
+        console.error("메시지 전송에 실패했습니다.", err);
+        setError({
+          message: "메시지 전송 중 오류가 발생했습니다.",
+          originalText: messageText,
+        });
+      }
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = { sender: "user", text: input };
+    setMessages((prev) => [...prev, userMessage]);
+    executeSend(input, threadId);
+    setInput("");
+  };
+
+  const handleRetry = () => {
+    if (error && error.originalText) {
+      setMessages((prev) => prev.slice(0, -1));
+      executeSend(error.originalText, threadId);
+    }
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  };
+
+  const chatForm = (
+    <form onSubmit={onSubmit} className={styles.form}>
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="메세지를 입력하세요."
+        className={styles.input}
+        disabled={isLoading}
+      />
+      <button
+        type={isLoading ? "button" : "submit"}
+        className={styles.submitBtn}
+        onClick={isLoading ? handleStop : undefined}
+        disabled={!input.trim() && !isLoading}
+      >
+        {isLoading ? (
+          <StopIcon className={styles.icon} />
+        ) : (
+          <PaperAirplaneIcon className={styles.icon} />
+        )}
+      </button>
+    </form>
+  );
+
+  if (isInitialView) {
+    return (
+      <div className={`${styles.window} ${styles.initialLayout}`}>
+        <div className={styles.welcome}>
+          <h1 className={styles.title}>Simon says</h1>
+          <p className={styles.subtitle}>무엇이든 물어보세요!</p>
+        </div>
+        {chatForm}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.window}>
@@ -71,7 +161,9 @@ export default function ChatWindow() {
         <div>
           <h1 className={styles.title}>Simon says</h1>
           <p className={styles.subtitle}>
-            {user?.email ? `${user.email}님, 안녕하세요!` : "사이먼이 당신의 질문에 응답합니다."}
+            {user?.email
+              ? `${user.email}님, 안녕하세요!`
+              : "사이먼이 당신의 질문에 응답합니다."}
           </p>
         </div>
         <button onClick={logout} className={styles.logoutBtn}>
@@ -93,21 +185,26 @@ export default function ChatWindow() {
               </ReactMarkdown>
             </div>
           ))}
+          {isLoading && (
+            <div className={`${styles.message} ${styles.aiMessage}`}>
+              <div className={styles.spinner}></div>
+            </div>
+          )}
+          {error && (
+            <div className={styles.errorMessage}>
+              <span>{error.message}</span>
+              {error.originalText && (
+                <button onClick={handleRetry} className={styles.retryButton}>
+                  <RetryIcon className={styles.icon} />
+                  <span>재시도</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
-      <form onSubmit={onSubmit} className={styles.form}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="메세지를 입력하세요."
-          className={styles.input}
-        />
-        <button type="submit" className={styles.submitBtn}>
-          전송
-        </button>
-      </form>
+      {chatForm}
     </div>
   );
 }
