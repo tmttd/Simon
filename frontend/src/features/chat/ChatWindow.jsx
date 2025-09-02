@@ -258,13 +258,21 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
     return (
       <div className={`${styles.window} ${styles.initialLayout}`}>
         <header className={styles.header}>
-          <div>
-            <h1 className={styles.title}>Simon says</h1>
-            <p className={styles.subtitle}>
-              {user?.email
-                ? `${user.email}님, 안녕하세요!`
-                : "무엇이든 물어보세요!"}
-            </p>
+          <div className={styles.brand}>
+            <img
+              src="/simon_logo_32.png"
+              srcSet="/simon_logo_32.png 1x, /simon_logo_64.png 2x, /simon_logo_96.png 3x"
+              alt="Simon logo"
+              className={styles.logo}
+            />
+            <div>
+              <h1 className={styles.title}>Simon says</h1>
+              <p className={styles.subtitle}>
+                {user?.email
+                  ? `${user.email}님, 안녕하세요!`
+                  : "무엇이든 물어보세요!"}
+              </p>
+            </div>
           </div>
           <button onClick={logout} className={styles.logoutBtn}>
             로그아웃
@@ -272,6 +280,12 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
         </header>
         <div className={styles.initialMain}>
           <div className={styles.welcome}>
+            <img
+              src="/simon_logo_48.png"
+              srcSet="/simon_logo_48.png 1x, /simon_logo_96.png 2x, /simon_logo_144.png 3x"
+              alt="Simon logo"
+              className={styles.logoLarge}
+            />
             <h1 className={styles.title}>무엇이든 물어보세요!</h1>
           </div>
           {chatForm}
@@ -283,13 +297,21 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   return (
     <div className={styles.window}>
       <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Simon says</h1>
-          <p className={styles.subtitle}>
-            {user?.email
-              ? `${user.email}님, 안녕하세요!`
-              : "사이먼이 당신의 질문에 응답합니다."}
-          </p>
+        <div className={styles.brand}>
+          <img
+            src="/simon_logo_32.png"
+            srcSet="/simon_logo_32.png 1x, /simon_logo_64.png 2x, /simon_logo_96.png 3x"
+            alt="Simon logo"
+            className={styles.logo}
+          />
+          <div>
+            <h1 className={styles.title}>Simon says</h1>
+            <p className={styles.subtitle}>
+              {user?.email
+                ? `${user.email}님, 안녕하세요!`
+                : "사이먼이 당신의 질문에 응답합니다."}
+            </p>
+          </div>
         </div>
         <button onClick={logout} className={styles.logoutBtn}>
           로그아웃
