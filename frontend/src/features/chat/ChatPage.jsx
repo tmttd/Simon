@@ -1,12 +1,15 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 import styles from "./ChatPage.module.css";
 import { api as apiClient } from "../../api/apiClient";
 
 export default function ChatPage() {
+  const { threadId } = useParams();
+  const navigate = useNavigate();
   const [threads, setThreads] = useState([]);
-  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [currentThreadId, setCurrentThreadId] = useState(threadId || null);
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -18,24 +21,29 @@ export default function ChatPage() {
     }
   }, []);
 
+  // URL 파라미터가 변경될 때 currentThreadId 동기화
+  useEffect(() => {
+    setCurrentThreadId(threadId || null);
+  }, [threadId]);
+
   useEffect(() => {
     fetchThreads();
   }, [fetchThreads]);
 
   const handleSelectThread = (threadId) => {
-    setCurrentThreadId(threadId);
+    navigate(`/chat/${threadId}`);
   };
 
   const handleNewChat = () => {
-    setCurrentThreadId(null);
+    navigate('/chat');
   };
 
   const onNewThreadStart = useCallback(
     (newThreadId) => {
       fetchThreads(); // 새 스레드가 생성되면 목록을 다시 불러옵니다.
-      setCurrentThreadId(newThreadId);
+      navigate(`/chat/${newThreadId}`);
     },
-    [fetchThreads]
+    [fetchThreads, navigate]
   );
 
   return (
