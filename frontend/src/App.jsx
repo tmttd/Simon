@@ -12,7 +12,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/chat" element={<ChatPage />} /> // ChatPage를 렌더링 //
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:threadId" element={<ChatPage />} />
           </Route>
           <Route path="/" element={<Navigate to="/chat" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />

@@ -8,9 +8,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 # === 쿠키 설정 상수 (cookie settings)===
 COOKIE_NAME = "refresh"
 COOKIE_PATH = "/api/auth/"
-COOKIE_SAMESITE = "Lax"
-COOKIE_SECURE = False
-MAX_AGE_SECONDS = 86400 # 1일
+COOKIE_SAMESITE = "Lax" # Lax -> Strict로 변경하여 CSRF 방어 강화
+COOKIE_SECURE_DEV = False
+COOKIE_SECURE_SERVER = True # 프로덕션에서는 항상 True여야 합니다.
+# MAX_AGE_SECONDS = 86400 # 1일 <-- 이 줄을 제거하거나 주석 처리합니다.
 
 def set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """ HttpOnly 쿠키를 심는 함수 """
@@ -18,10 +19,10 @@ def set_refresh_cookie(response: Response, refresh_token: str) -> None:
         key=COOKIE_NAME,
         value=refresh_token,
         httponly=True,
-        secure=COOKIE_SECURE,
+        secure=COOKIE_SECURE_DEV,
         samesite=COOKIE_SAMESITE,
         path=COOKIE_PATH,
-        max_age=MAX_AGE_SECONDS,
+        # max_age를 설정하지 않으면 브라우저 종료 시 쿠키가 삭제됩니다.
     )
 
 class CookieTokenObtainPairView(TokenObtainPairView):
