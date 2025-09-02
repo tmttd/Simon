@@ -54,6 +54,7 @@ jobs:
             git pull || true
 
             echo ">>> Rebuilding and restarting services..."
+            docker compose down
             docker compose up --build -d
             docker compose restart frontend
 
