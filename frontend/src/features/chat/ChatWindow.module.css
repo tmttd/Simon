@@ -30,6 +30,10 @@
   gap: 12px;
 }
 
+.mobileMenuBtn {
+  display: none;
+}
+
 .logo {
   width: 28px;
   height: 28px;
@@ -280,6 +284,32 @@
 .window.initialLayout {
   display: grid;
   grid-template-rows: auto 1fr auto;
+}
+
+/* 모바일에서 메뉴 버튼 노출 및 헤더 레이아웃 보정 */
+@media (max-width: 768px) {
+  .header {
+    gap: 12px;
+  }
+
+  .mobileMenuBtn {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid #374151;
+    background:
+      linear-gradient(currentColor, currentColor) left 10px top 12px / 16px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) left 10px center / 16px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) left 10px bottom 12px / 16px 2px no-repeat;
+    color: #f9fafb;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand {
+    flex: 1;
+  }
 }
 
 .initialMain {

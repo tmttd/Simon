@@ -46,18 +46,33 @@ export default function ChatPage() {
     [fetchThreads, navigate]
   );
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const openSidebar = () => setIsSidebarOpen(true);
+  const closeSidebar = () => setIsSidebarOpen(false);
+  const handleSelectThreadWrapped = (tid) => {
+    handleSelectThread(tid);
+    closeSidebar();
+  };
+
   return (
     <div className={styles.chatPage}>
-      <Sidebar
-        threads={threads}
-        setThreads={setThreads}
-        selectedThreadId={currentThreadId}
-        onSelectThread={handleSelectThread}
-        onNewChat={handleNewChat}
-      />
+      <div className={`${styles.sidebarWrapper} ${isSidebarOpen ? styles.open : ""}`}>
+        <Sidebar
+          threads={threads}
+          setThreads={setThreads}
+          selectedThreadId={currentThreadId}
+          onSelectThread={handleSelectThreadWrapped}
+          onNewChat={() => { handleNewChat(); closeSidebar(); }}
+        />
+      </div>
+
+      <div className={styles.backdrop} onClick={closeSidebar} />
+
       <ChatWindow
         threadId={currentThreadId}
         onNewThreadStart={onNewThreadStart}
+        onOpenMenu={openSidebar}
       />
     </div>
   );

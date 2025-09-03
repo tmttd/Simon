@@ -4,3 +4,46 @@
   width: 100vw;
   overflow: hidden;
 }
+
+.sidebarWrapper {
+  position: relative;
+}
+
+.backdrop {
+  display: none;
+}
+
+/* 모바일: 사이드바를 오프캔버스로 전환 */
+@media (max-width: 768px) {
+  .chatPage {
+    position: relative;
+  }
+
+  .sidebarWrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80vw;
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    z-index: 20;
+  }
+
+  .open {
+    transform: translateX(0);
+  }
+
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: none;
+    z-index: 10;
+  }
+
+  .open ~ .backdrop {
+    display: block;
+  }
+}

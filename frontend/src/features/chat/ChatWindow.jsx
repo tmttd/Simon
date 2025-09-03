@@ -7,7 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import styles from "./ChatWindow.module.css";
 import { PaperAirplaneIcon, StopIcon, RetryIcon } from "./icons.jsx";
 
-export default function ChatWindow({ threadId, onNewThreadStart }) {
+export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -368,6 +368,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   return (
     <div className={styles.window}>
       <header className={styles.header}>
+        <button className={styles.mobileMenuBtn} onClick={onOpenMenu} aria-label="Open menu" />
         <div className={styles.brand}>
           <img
             src="/simon_logo_32.png"
