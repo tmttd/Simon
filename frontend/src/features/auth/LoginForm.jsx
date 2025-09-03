@@ -62,6 +62,12 @@ export default function LoginForm() {
   return (
     <div className={styles.page}>
       <form noValidate onSubmit={handleSubmit(onSubmit)} className={styles.card}>
+        <img
+          src="/simon_logo_48.png"
+          srcSet="/simon_logo_48.png 1x, /simon_logo_96.png 2x, /simon_logo_144.png 3x"
+          alt="Simon logo"
+          className={styles.logo}
+        />
         <h1 className={styles.title}>Simon-AI 로그인</h1>
         <p className={styles.subtitle}>계정에 접속하여 계속 진행하세요.</p>
 
