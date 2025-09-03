@@ -329,6 +329,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     return (
       <div className={`${styles.window} ${styles.initialLayout}`}>
         <header className={styles.header}>
+          <button className={styles.mobileMenuBtn} onClick={onOpenMenu} aria-label="Open menu" />
           <div className={styles.brand}>
             <img
               src="/simon_logo_32.png"
