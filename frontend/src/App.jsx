@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./features/auth/LoginForm";
+import SignupForm from "./features/auth/SignupForm";
 import ChatPage from "./features/chat/ChatPage"; // ChatWindow 대신 ChatPage를 임포트
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
@@ -11,6 +12,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
+          <Route path="/signup" element={<SignupForm />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/chat/:threadId" element={<ChatPage />} />

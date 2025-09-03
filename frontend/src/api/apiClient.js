@@ -105,6 +105,18 @@ export async function me() {
   return res.data;
 }
 
+export async function signup({ email, username, password, passwordConfirm, firstName, lastName }) {
+  const res = await api.post("auth/signup/", { 
+    email, 
+    username,
+    password, 
+    password_confirm: passwordConfirm,
+    first_name: firstName,
+    last_name: lastName
+  });
+  return res.data;
+}
+
 export async function logout() {
   // 서버에 Refresh Token 무효화를 요청합니다.
   // HttpOnly 쿠키를 보내기 위해 withCredentials를 사용해야 할 수 있습니다.
