@@ -411,7 +411,11 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
           {isLoading && !isStreaming && requestStartTimeRef.current && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
               <div className={styles.loadingContainer}>
-                <div className={styles.spinner}></div>
+                <div className={styles.loadingDots}>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                </div>
                 <div className={styles.timer}>
                   {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
                 </div>

@@ -240,21 +240,39 @@
 
 
 
-.spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  width: 24px;
+.loadingDots {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
   height: 24px;
-  border-radius: 50%;
-  border-left-color: #09f;
-  animation: spin 1s ease infinite;
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
+.loadingDots > div {
+  width: 6px;
+  height: 6px;
+  background: #9ca3af;
+  border-radius: 50%;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.loadingDots > div:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.loadingDots > div:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.loadingDots > div:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
   }
-  100% {
-    transform: rotate(360deg);
+  30% {
+    transform: translateY(-8px);
   }
 }
 
