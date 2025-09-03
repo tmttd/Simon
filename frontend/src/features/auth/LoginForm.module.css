@@ -23,6 +23,14 @@
   box-shadow: 0 12px 36px rgba(0,0,0,.06);
 }
 
+/* ===== 로고 ===== */
+.logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 24px auto;
+  display: block;
+}
+
 /* ===== 타이포 ===== */
 .title {
   margin: 0 0 8px 0;
