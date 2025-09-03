@@ -18,6 +18,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
   const requestStartTimeRef = useRef(null);
+  const skipHistoryForThreadRef = useRef(null); // 방금 생성한 스레드의 초기 히스토리 fetch를 1회 건너뛰기 위한 플래그
 
   const isNewChat = !threadId;
 
@@ -27,6 +28,12 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
   useEffect(() => {
     if (isNewChat) {
       setMessages([]);
+      return;
+    }
+
+    // 방금 생성한 스레드라면, 초기 히스토리 요청 1회 건너뛰기 (타이핑 애니메이션 보존)
+    if (skipHistoryForThreadRef.current === threadId) {
+      skipHistoryForThreadRef.current = null;
       return;
     }
 
@@ -92,10 +99,6 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
         }
       );
 
-      if (isNewChat) {
-        onNewThreadStart(newThreadId);
-      }
-
       if (response.data && response.data.response) {
         const duration = (Date.now() - requestStartTimeRef.current) / 1000;
         
@@ -112,6 +115,16 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
 
         // 타이핑 애니메이션 시작
         await typeMessage(response.data.response, duration);
+
+        // 스트리밍 완료 후 백그라운드 동기화로 깜빡임 없이 서버 기록 반영
+        await fetchAndMergeHistory(newThreadId);
+
+        // 새 스레드 라우팅은 타이핑이 끝난 뒤에 수행하여 리마운트/깜빡임 방지
+        if (isNewChat) {
+          // 첫 히스토리 fetch 1회 스킵해 애니메이션 결과가 덮어쓰이지 않게 함
+          skipHistoryForThreadRef.current = newThreadId;
+          onNewThreadStart(newThreadId);
+        }
       }
     } catch (err) {
       if (err.name === "CanceledError") {
@@ -171,6 +184,64 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
       if (i < chars.length) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
+    }
+  };
+
+  // 스트리밍 종료 후 서버 히스토리를 백그라운드로 가져와 현재 메시지와 깜빡임 없이 병합
+  const fetchAndMergeHistory = async (tid) => {
+    try {
+      const response = await apiClient.get(`/chat/history/${tid}/`);
+      const serverHistory = response.data && Array.isArray(response.data.history) ? response.data.history : [];
+
+      setMessages((prev) => {
+        const normalize = (arr) => arr.map((m) => ({
+          sender: m.sender,
+          text: (m.text || "").replace(/▋$/, ""),
+        }));
+
+        const prevNorm = normalize(prev);
+        const serverNorm = normalize(serverHistory);
+
+        // 앞부분 동일하고 서버가 더 길면, 부족한 뒤쪽만 추가
+        let i = 0;
+        while (
+          i < prevNorm.length &&
+          i < serverNorm.length &&
+          prevNorm[i].sender === serverNorm[i].sender &&
+          prevNorm[i].text === serverNorm[i].text
+        ) {
+          i++;
+        }
+
+        if (i === prevNorm.length && serverNorm.length > prevNorm.length) {
+          const toAppend = serverHistory.slice(prev.length).map((m) => ({
+            sender: m.sender,
+            text: m.text || "",
+            duration: 0,
+            isTyping: false,
+          }));
+          return [...prev, ...toAppend];
+        }
+
+        // 길이 같고 마지막 하나만 다르면 마지막만 교체(덜 깜빡이게)
+        if (
+          prevNorm.length === serverNorm.length &&
+          prevNorm.length > 0 &&
+          i === prevNorm.length - 1
+        ) {
+          const updated = [...prev];
+          const last = { ...updated[updated.length - 1] };
+          last.text = serverHistory[serverHistory.length - 1].text || "";
+          last.isTyping = false;
+          updated[updated.length - 1] = last;
+          return updated;
+        }
+
+        // 완전히 동일하거나 서버가 짧거나 초반 불일치면 그대로 둠(덮어쓰기 회피)
+        return prev;
+      });
+    } catch (e) {
+      console.error("히스토리 동기화 실패:", e);
     }
   };
 

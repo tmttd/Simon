@@ -56,7 +56,6 @@ export default function ChatPage() {
         onNewChat={handleNewChat}
       />
       <ChatWindow
-        key={currentThreadId}
         threadId={currentThreadId}
         onNewThreadStart={onNewThreadStart}
       />
