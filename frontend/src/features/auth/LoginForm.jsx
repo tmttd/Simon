@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -116,6 +116,15 @@ export default function LoginForm() {
         >
           {isSubmitting ? "로그인 중입니다..." : "로그인"}
         </button>
+
+        <div className={styles.linkContainer}>
+          <p className={styles.linkText}>
+            계정이 없으신가요?{" "}
+            <Link to="/signup" className={styles.link}>
+              회원가입
+            </Link>
+          </p>
+        </div>
       </form>
     </div>
   );

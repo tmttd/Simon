@@ -269,7 +269,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
               <h1 className={styles.title}>Simon says</h1>
               <p className={styles.subtitle}>
                 {user?.email
-                  ? `${user.email}님, 안녕하세요!`
+                  ? `${user.username || (user.first_name && user.last_name ? `${user.last_name}${user.first_name}` : user.email)}님, 안녕하세요!`
                   : "무엇이든 물어보세요!"}
               </p>
             </div>
@@ -308,7 +308,7 @@ export default function ChatWindow({ threadId, onNewThreadStart }) {
             <h1 className={styles.title}>Simon says</h1>
             <p className={styles.subtitle}>
               {user?.email
-                ? `${user.email}님, 안녕하세요!`
+                ? `${user.username || (user.first_name && user.last_name ? `${user.last_name}${user.first_name}` : user.email)}님, 안녕하세요!`
                 : "사이먼이 당신의 질문에 응답합니다."}
             </p>
           </div>

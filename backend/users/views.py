@@ -4,6 +4,29 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
+User = get_user_model()
+
+# === 회원가입 Serializer ===
+class SignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+    
+    class Meta:
+        model = User
+        fields = ('email', 'username', 'password', 'password_confirm', 'first_name', 'last_name')
+    
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError("비밀번호가 일치하지 않습니다.")
+        return attrs
+    
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        user = User.objects.create_user(**validated_data)
+        return user
 
 # === 쿠키 설정 상수 (cookie settings)===
 COOKIE_NAME = "refresh"
@@ -84,10 +107,13 @@ class MeView(APIView):
         
         return Response({
             "id": user.id,
-            "username": user.username,
             "email": user.email,
-            "password": user.password,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "date_joined": user.date_joined,
         })
     
 class LogoutView(APIView):
@@ -119,3 +145,26 @@ class LogoutView(APIView):
         # 쿠키 사용 안 함
         resp["Cache-Control"] = "no-store"
         return resp
+
+class SignupView(APIView):
+    """
+    엔드포인트: api/auth/signup/
+    회원가입
+    - 이메일, 비밀번호, 비밀번호 확인을 받아서 새 사용자를 생성합니다.
+    - 성공 시 생성된 사용자 정보를 반환합니다.
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request, *args, **kwargs):
+        serializer = SignupSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "message": "회원가입이 완료되었습니다."
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

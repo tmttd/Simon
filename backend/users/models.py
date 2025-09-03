@@ -36,7 +36,8 @@ class CustomUserManager(BaseUserManager):
 
 
 class CustomUser(AbstractUser):
-    username = None
+    # username을 닉네임으로 사용 (unique=False로 설정하여 중복 허용)
+    username = models.CharField(_('nickname'), max_length=150, blank=True)
     email = models.EmailField(_('email address'), unique=True)
 
     USERNAME_FIELD = 'email'
@@ -45,4 +46,4 @@ class CustomUser(AbstractUser):
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.email
+        return self.username if self.username else self.email
