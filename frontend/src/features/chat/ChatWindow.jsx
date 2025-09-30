@@ -11,19 +11,56 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false); // 스트리밍 상태 추가
+  const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
   const requestStartTimeRef = useRef(null);
+  const pendingThreadIdRef = useRef(null);
   const skipHistoryForThreadRef = useRef(null); // 방금 생성한 스레드의 초기 히스토리 fetch를 1회 건너뛰기 위한 플래그
+  const currentThreadIdRef = useRef(threadId);
+  const threadStatusRef = useRef({});
 
   const isNewChat = !threadId;
+  const isBusy = isSending || isFetchingHistory;
 
   // 초기 렌더링 상태인지 판단 (애니메이션 클래스 적용 기준)
   const isInitialView = isNewChat && messages.length === 0;
+
+  const getStatusKey = (tid) => (tid == null ? "__new__" : tid);
+
+  const updateThreadStatus = (tid, updates) => {
+    const key = getStatusKey(tid);
+    const prevStatus = threadStatusRef.current[key] || {};
+    const nextStatus = { ...prevStatus, ...updates };
+    threadStatusRef.current[key] = nextStatus;
+
+    if (key === getStatusKey(currentThreadIdRef.current)) {
+      if ("isSending" in updates) {
+        setIsSending(!!nextStatus.isSending);
+      }
+      if ("isStreaming" in updates) {
+        setIsStreaming(!!nextStatus.isStreaming);
+      }
+      if ("requestStartTime" in updates) {
+        requestStartTimeRef.current =
+          updates.requestStartTime != null ? updates.requestStartTime : null;
+      }
+    }
+
+    return nextStatus;
+  };
+
+  useEffect(() => {
+    currentThreadIdRef.current = threadId;
+    const status = threadStatusRef.current[getStatusKey(threadId)] || {};
+    setIsSending(!!status.isSending);
+    setIsStreaming(!!status.isStreaming);
+    requestStartTimeRef.current = status.requestStartTime ?? null;
+  }, [threadId]);
 
   useEffect(() => {
     if (isNewChat) {
@@ -38,18 +75,39 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     }
 
     const fetchHistory = async () => {
-      setIsLoading(true);
+      setIsFetchingHistory(true);
       setError(null);
       try {
         const response = await apiClient.get(`/chat/history/${threadId}/`);
         if (response.data && Array.isArray(response.data.history)) {
-          setMessages(response.data.history);
+          const serverHistory = response.data.history;
+          setMessages((prev) => {
+            if (threadId !== currentThreadIdRef.current) {
+              return prev;
+            }
+            return serverHistory.map((message) => ({
+              ...message,
+              threadId,
+              isTyping: false,
+            }));
+          });
+
+          // 완료 판정: 마지막 항목이 ai이고 text가 존재하면 완료로 간주
+          const last = serverHistory[serverHistory.length - 1];
+          const isComplete = !!last && last.sender === "ai" && !!(last.text && last.text.length > 0);
+          if (isComplete) {
+            updateThreadStatus(threadId, {
+              isSending: false,
+              isStreaming: false,
+              requestStartTime: null,
+            });
+          }
         }
       } catch (error) {
         console.error("채팅 기록을 불러오는 데 실패했습니다.", error);
         setError({ message: "채팅 기록을 불러오는 데 실패했습니다." });
       } finally {
-        setIsLoading(false);
+        setIsFetchingHistory(false);
       }
     };
 
@@ -60,10 +118,10 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     if (mainRef.current) {
       mainRef.current.scrollTop = mainRef.current.scrollHeight;
     }
-  }, [messages, isLoading, error]);
+  }, [messages, isBusy, error]);
 
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isSending) return;
 
     let frameId;
     const frame = () => {
@@ -76,16 +134,22 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [isLoading]);
+  }, [isSending]);
 
   const executeSend = async (messageText, currentThreadId) => {
-    setIsLoading(true);
-    setIsStreaming(false); // 처음에는 로딩 상태 유지
+    const newThreadId = isNewChat ? uuidv4() : currentThreadId;
+    const requestStartTime = Date.now();
+    updateThreadStatus(newThreadId, {
+      isSending: true,
+      isStreaming: false,
+      requestStartTime,
+    });
+    if (getStatusKey(newThreadId) === getStatusKey(currentThreadIdRef.current)) {
+      requestStartTimeRef.current = requestStartTime;
+    }
     setError(null);
     abortControllerRef.current = new AbortController();
-    requestStartTimeRef.current = Date.now();
-
-    const newThreadId = isNewChat ? uuidv4() : currentThreadId;
+    pendingThreadIdRef.current = newThreadId;
 
     try {
       const response = await apiClient.post(
@@ -100,21 +164,23 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       );
 
       if (response.data && response.data.response) {
-        const duration = (Date.now() - requestStartTimeRef.current) / 1000;
+        const storedRequestStart = threadStatusRef.current[getStatusKey(newThreadId)]?.requestStartTime;
+        const duration = storedRequestStart ? (Date.now() - storedRequestStart) / 1000 : 0;
         
         // API 응답을 받은 후 스트리밍 상태로 변경
-        setIsStreaming(true);
+        updateThreadStatus(newThreadId, { isStreaming: true });
         
         // AI 메시지를 미리 추가 (타이핑 애니메이션용)
         const aiMessage = {
           sender: "ai",
           text: "",
           duration: 0,
+          threadId: newThreadId,
         };
         setMessages((prev) => [...prev, aiMessage]);
 
         // 타이핑 애니메이션 시작
-        await typeMessage(response.data.response, duration);
+        await typeMessage(response.data.response, duration, newThreadId);
 
         // 스트리밍 완료 후 백그라운드 동기화로 깜빡임 없이 서버 기록 반영
         await fetchAndMergeHistory(newThreadId);
@@ -139,21 +205,30 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
         setMessages((prev) => {
           const newMessages = [...prev];
           const lastMessage = newMessages[newMessages.length - 1];
-          if (lastMessage && lastMessage.sender === "ai" && (!lastMessage.text || lastMessage.text === "")) {
+          if (
+            lastMessage &&
+            lastMessage.sender === "ai" &&
+            lastMessage.threadId === pendingThreadIdRef.current &&
+            (!lastMessage.text || lastMessage.text === "")
+          ) {
             newMessages.pop();
           }
           return newMessages;
         });
       }
     } finally {
-      setIsLoading(false);
-      setIsStreaming(false);
+      pendingThreadIdRef.current = null;
+      updateThreadStatus(newThreadId, {
+        isSending: false,
+        isStreaming: false,
+        requestStartTime: null,
+      });
       abortControllerRef.current = null;
     }
   };
 
   // 타이핑 애니메이션 함수
-  const typeMessage = async (fullText, duration) => {
+  const typeMessage = async (fullText, duration, targetThreadId) => {
     const chars = fullText.split('');
     const TYPING_SPEED = 8; // 초당 글자 수 (원하는 속도로 조절 가능)
     const delay = 1000 / TYPING_SPEED; // 각 글자 간격 (ms)
@@ -162,6 +237,9 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       if (abortControllerRef.current?.signal.aborted) {
         break; // 중단된 경우 타이핑 중지
       }
+      if (currentThreadIdRef.current !== targetThreadId) {
+        break;
+      }
       
       const currentText = chars.slice(0, i).join('');
       // 타이핑 중일 때는 커서를 텍스트에 직접 포함
@@ -169,14 +247,23 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       
       setMessages((prev) => {
         const newMessages = [...prev];
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage && lastMessage.sender === "ai") {
-          lastMessage.text = displayText;
-          lastMessage.isTyping = i < chars.length; // 타이핑 상태 추가
-          if (i === chars.length) {
-            lastMessage.duration = duration; // 타이핑 완료 시 duration 설정
-            lastMessage.isTyping = false;
+        let lastMessageIndex = -1;
+        for (let idx = newMessages.length - 1; idx >= 0; idx--) {
+          const msg = newMessages[idx];
+          if (msg.sender === "ai" && msg.threadId === targetThreadId) {
+            lastMessageIndex = idx;
+            break;
           }
+        }
+        if (lastMessageIndex === -1) {
+          return prev;
+        }
+        const lastMessage = newMessages[lastMessageIndex];
+        lastMessage.text = displayText;
+        lastMessage.isTyping = i < chars.length;
+        if (i === chars.length) {
+          lastMessage.duration = duration;
+          lastMessage.isTyping = false;
         }
         return newMessages;
       });
@@ -194,15 +281,19 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       const serverHistory = response.data && Array.isArray(response.data.history) ? response.data.history : [];
 
       setMessages((prev) => {
-        const normalize = (arr) => arr.map((m) => ({
-          sender: m.sender,
-          text: (m.text || "").replace(/▋$/, ""),
-        }));
+        if (tid !== currentThreadIdRef.current) {
+          return prev;
+        }
+
+        const normalize = (arr) =>
+          arr.map((m) => ({
+            sender: m.sender,
+            text: (m.text || "").replace(/▋$/, ""),
+          }));
 
         const prevNorm = normalize(prev);
         const serverNorm = normalize(serverHistory);
 
-        // 앞부분 동일하고 서버가 더 길면, 부족한 뒤쪽만 추가
         let i = 0;
         while (
           i < prevNorm.length &&
@@ -219,11 +310,11 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
             text: m.text || "",
             duration: 0,
             isTyping: false,
+            threadId: tid,
           }));
           return [...prev, ...toAppend];
         }
 
-        // 길이 같고 마지막 하나만 다르면 마지막만 교체(덜 깜빡이게)
         if (
           prevNorm.length === serverNorm.length &&
           prevNorm.length > 0 &&
@@ -233,11 +324,22 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
           const last = { ...updated[updated.length - 1] };
           last.text = serverHistory[serverHistory.length - 1].text || "";
           last.isTyping = false;
+          last.threadId = tid;
           updated[updated.length - 1] = last;
           return updated;
         }
 
-        // 완전히 동일하거나 서버가 짧거나 초반 불일치면 그대로 둠(덮어쓰기 회피)
+        // 완료 판정: 마지막 항목이 ai이고 text가 존재하면 완료로 간주
+        const last = serverHistory[serverHistory.length - 1];
+        const isComplete = !!last && last.sender === "ai" && !!(last.text && last.text.length > 0);
+        if (isComplete) {
+          updateThreadStatus(tid, {
+            isSending: false,
+            isStreaming: false,
+            requestStartTime: null,
+          });
+        }
+
         return prev;
       });
     } catch (e) {
@@ -247,7 +349,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isBusy) return;
 
     const userMessage = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
@@ -265,7 +367,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+Enter 또는 Cmd+Enter: 전송
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isBusy) return;
         
         const userMessage = { sender: "user", text: input };
         setMessages((prev) => [...prev, userMessage]);
@@ -307,16 +409,16 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
         onKeyDown={handleKeyDown}
         placeholder="메세지를 입력하세요. (Ctrl+Enter: 전송)"
         className={styles.input}
-        disabled={isLoading}
+        disabled={isBusy}
         rows={1}
       />
       <button
-        type={isLoading ? "button" : "submit"}
+        type={isSending ? "button" : "submit"}
         className={styles.submitBtn}
-        onClick={isLoading ? handleStop : undefined}
-        disabled={!input.trim() && !isLoading}
+        onClick={isSending ? handleStop : undefined}
+        disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending)}
       >
-        {isLoading ? (
+        {isSending ? (
           <StopIcon className={styles.icon} />
         ) : (
           <PaperAirplaneIcon className={styles.icon} />
@@ -410,7 +512,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
               )}
             </div>
           ))}
-          {isLoading && !isStreaming && requestStartTimeRef.current && (
+          {isSending && pendingThreadIdRef.current === threadId && !isStreaming && requestStartTimeRef.current && (
             <div className={`${styles.message} ${styles.aiMessage}`}>
               <div className={styles.loadingContainer}>
                 <div className={styles.loadingDots}>
