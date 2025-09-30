@@ -21,7 +21,7 @@ TARGET = 120
 
 
 # Documnet Retriever 구성 정보
-PERSIST_DIRECTORY = os.path.join(BASE_DIR, 'agent', 'chroma_db')
+PERSIST_DIRECTORY = os.path.join(BASE_DIR, 'simon', 'chroma_db')
 COLLECTION_NAME = 'nutrition_facts'
 QUERY_EMBEDDING_MODEL_NAME = 'solar-embedding-1-large-query'
 DOCUMENT_EMBEDDING_MODEL_NAME = 'solar-embedding-1-large-passage'

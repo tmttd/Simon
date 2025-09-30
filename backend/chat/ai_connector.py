@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage, AIMessage
-from agent.workflow import app
+from agent.simon.workflow import app
 
 def get_ai_response(user_message:str, thread_id:str) -> str:
     """
