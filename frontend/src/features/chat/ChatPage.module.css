@@ -9,6 +9,23 @@
   position: relative;
 }
 
+.toInitBtn {
+  width: 100%;
+  background: linear-gradient(90deg, var(--brand), #7a34b0);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter .12s ease, transform .12s ease, box-shadow .12s ease;
+}
+.toInitBtn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(122,52,176,0.35);
+}
+
 .backdrop {
   display: none;
 }

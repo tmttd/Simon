@@ -7,7 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import styles from "./ChatWindow.module.css";
 import { PaperAirplaneIcon, StopIcon, RetryIcon } from "./icons.jsx";
 
-export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
+export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpenMenu }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -157,6 +157,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
         {
           message: messageText,
           thread_id: newThreadId,
+          group_id: groupId || null,
         },
         {
           signal: abortControllerRef.current.signal,

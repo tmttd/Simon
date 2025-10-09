@@ -129,3 +129,50 @@ export async function logout() {
     clearAccessToken();
   }
 }
+
+// 분류 생성: 텍스트 + 다중 이미지 업로드
+export async function classifyStudy({ noteText, files }) {
+  const form = new FormData();
+  if (noteText) form.append("note_text", noteText);
+  if (Array.isArray(files)) {
+    for (const f of files) {
+      form.append("files", f);
+    }
+  }
+  const res = await api.post("chat/classify/", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data; // { group, threads, count }
+}
+
+// 그룹/스레드 목록 API
+export async function listStudyGroups() {
+  const res = await api.get("chat/groups/");
+  return res.data; // [{ id, title }]
+}
+
+export async function listThreads({ ungrouped = false } = {}) {
+  const query = ungrouped ? "?ungrouped=1" : "";
+  const res = await api.get(`chat/threads/${query}`);
+  return res.data; // [{ id, title, group_id }]
+}
+
+export async function getGroupDetail(groupId) {
+  const res = await api.get(`chat/group/${groupId}/`);
+  return res.data; // { group: {id,title}, threads: [...], count }
+}
+
+export async function createGroup(title) {
+  const res = await api.post("chat/groups/create/", { title });
+  return res.data; // { id, title }
+}
+
+export async function assignThreadToGroup(threadId, groupId) {
+  const res = await api.patch(`chat/thread/${threadId}/`, { group_id: groupId });
+  return res.data; // updated thread
+}
+
+export async function deleteGroup(groupId) {
+  const res = await api.delete(`chat/group/${groupId}/`);
+  return res.data;
+}

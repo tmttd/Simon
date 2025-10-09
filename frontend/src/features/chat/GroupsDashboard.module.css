@@ -1,0 +1,46 @@
+.page { min-height: 100vh; background: #0b1220; color: #f9fafb; padding: 24px; }
+.board { max-width: 1200px; margin: 0 auto; border:1px solid #1f2937; border-radius:16px; padding:16px 16px 24px 16px; background: linear-gradient(180deg, #0e1626 0%, #0b1220 100%); }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1100px;
+  margin: 0 auto 16px auto;
+}
+
+.brandWrap { display:flex; align-items:center; gap:10px; }
+.brandLogo { width:32px; height:32px; }
+.topActions { display:flex; gap:8px; }
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:16px; max-width:1100px; margin:0 auto; }
+
+.card { aspect-ratio:1/1; background: radial-gradient(120% 120% at 0% 0%, rgba(174,76,240,0.18), rgba(14,22,38,0.85)); border:1px solid rgba(174,76,240,0.25); border-radius:14px; box-shadow: 0 12px 24px rgba(0,0,0,0.25); padding:16px; display:flex; flex-direction:column; justify-content:space-between; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 18px 36px rgba(0,0,0,0.35); border-color: var(--brand); }
+
+.cardTitle { font-weight:700; font-size:16px; }
+
+.metaRow { margin-top:6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.metaBadge { background: rgba(255,255,255,0.08); color:#e5e7eb; border:1px solid rgba(255,255,255,0.14); border-radius:999px; padding:4px 8px; font-size:12px; }
+.metaBadgeAlt { background: rgba(174,76,240,0.12); color:#e9d5ff; border:1px solid rgba(174,76,240,0.3); border-radius:999px; padding:4px 8px; font-size:12px; }
+
+.cardActions { display: flex; gap: 8px; }
+
+.primaryBtn { background: linear-gradient(90deg, var(--brand), #7a34b0); color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:800; box-shadow: 0 8px 18px rgba(122,52,176,0.35); }
+.secondaryBtn { background: transparent; color:#f9fafb; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 12px; }
+.secondaryBtn:hover { border-color: #fff; }
+.dangerBtn { background: transparent; color:#fecaca; border:1px solid rgba(239,68,68,0.5); border-radius:8px; padding:8px 12px; }
+.dangerBtn:hover { border-color: #ef4444; color:#fff; }
+
+.highlight { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+.hint { text-align: center; color: #cbd5e1; }
+.err { text-align: center; color: #fca5a5; }
+
+

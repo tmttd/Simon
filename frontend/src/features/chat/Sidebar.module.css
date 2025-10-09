@@ -1,16 +1,16 @@
 .sidebar {
-  background-color: #1f2937;
+  background: linear-gradient(180deg, #0e1626 0%, #0b1220 100%);
   color: #f9fafb;
   width: 260px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #374151;
+  border-right: 1px solid #1f2937;
 }
 
 .header {
   padding: 16px;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid #1f2937;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -18,17 +18,18 @@
 
 .header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .newChatBtn {
-  background: var(--brand);
+  background: linear-gradient(90deg, var(--brand), #7a34b0);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 6px 14px rgba(122,52,176,0.35);
 }
 
 .threadList {
@@ -39,8 +40,44 @@
   flex-grow: 1;
 }
 
+.groupItem {
+  margin-bottom: 6px;
+}
+
+.groupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: radial-gradient(120% 120% at 0% 0%, rgba(174,76,240,0.18), rgba(14,22,38,0.85));
+  border: 1px solid rgba(174,76,240,0.25);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.groupHeader:hover { border-color: var(--brand); }
+
+.groupTitle {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.groupToggle {
+  opacity: 0.7;
+}
+
+.childList {
+  list-style: none;
+  margin: 6px 0 10px 0;
+  padding-left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .threadItem {
-  padding: 12px 16px;
+  padding: 10px 12px;
   cursor: pointer;
   border-radius: var(--radius);
   transition: background-color 0.15s ease;
@@ -50,9 +87,7 @@
   gap: 8px;
 }
 
-.threadItem:hover {
-  background: #374151;
-}
+.threadItem:hover { background: rgba(255,255,255,0.06); }
 
 .threadItem:hover .actions {
   opacity: 1;
@@ -73,6 +108,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 13px;
 }
 
 .actions {
@@ -94,9 +130,7 @@
   justify-content: center;
 }
 
-.actionBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
+.actionBtn:hover { background: rgba(255, 255, 255, 0.12); }
 
 .actionBtn svg {
   width: 16px;
