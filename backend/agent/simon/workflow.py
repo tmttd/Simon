@@ -1,71 +1,90 @@
+import os
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 
-## 4. Workflow(그래프 구조) 생성
-
-# * 그래프 생성(작업 흐름) 및 컴파일을 통해 `app`을 만듭니다!
-
-# * 작업순서:
-#   1. `StateGraph(AgentState)` 초기화
-#   2. `add_node`를 통해 node 추가
-#   3. `set_entry_point`를 통해 시작 지점 설정
-#   4. `conditional_edge`의 분기 판단을 위한 함수 생성
-#   5. `add_edge`를 통해 분기 없이 진행되는 경우 설정
-#   6. `END`와 연결하며 workflow 마무리
-
-from .nodes.nodes import (
-    AgentState, set_mode, entry_point_routing, continue_information_gathering,
-    call_triage_agent, call_information_agent, call_factor_agent, call_answering_agent,
-    call_nutirion_agent, call_insulin_agent, call_cleanup_node, call_cleanup_node,)
-
-
-# workflow 클래스 생성
-workflow = StateGraph(AgentState)
-
-# 노드 생성 및 추가
-workflow.add_node("triage_node", call_triage_agent)
-workflow.add_node("information_node", call_information_agent)
-workflow.add_node("factor_node", call_factor_agent)
-workflow.add_node("nutrition_node", call_nutirion_agent)
-workflow.add_node("insulin_node", call_insulin_agent)
-workflow.add_node("answer_node", call_answering_agent)
-workflow.add_node("cleanup_node", call_cleanup_node)
-
-# 엣지 생성(workflow 흐름 설계)
-workflow.set_conditional_entry_point(
-    entry_point_routing,
-    {
-        "triage_node": "triage_node",
-        "information_node": "information_node",
-        "answer_node": "answer_node" 
-    }
+# --- 로컬 모듈 임포트 ---
+# 상태 정의, 노드 함수, 라우터 함수를 가져옵니다.
+from simon.nodes.nodes import (
+    AgentState,
+    initial_classifier,
+    instructor,
+    decide_after_instructor,
+    tester,
+    decide_after_tester,
+    route_tasks
 )
-workflow.add_conditional_edges(
-    "triage_node",
-    set_mode,
-    {
-        "meal": "information_node",
-        "correction": "information_node",
-        "query": "answer_node"
-    }
-)
-workflow.add_conditional_edges(
-    "information_node",
-    continue_information_gathering,
-    {
-        "nutrition": "nutrition_node",
-        "continue": END,
-        "complete": "factor_node"
-    }
-)
-workflow.add_edge("nutrition_node", "information_node")
-workflow.add_edge("factor_node", "insulin_node")
-workflow.add_edge("insulin_node", "answer_node")
-workflow.add_edge("answer_node", "cleanup_node")
-workflow.add_edge("cleanup_node", END)
 
-# 메모리는 MemorySaver에 저장합니다. state를 저장한다는 의미입니다.
-memory = MemorySaver()
-app = workflow.compile(checkpointer=memory)
+def create_workflow() -> StateGraph:
+    """
+    Simon AI 에이전트의 StateGraph 워크플로우를 생성하고 구성합니다.
+    
+    Returns:
+        구성된 StateGraph 객체. 컴파일 전 상태입니다.
+    """
+    # StateGraph 객체를 생성합니다. AgentState를 상태 스키마로 사용합니다.
+    workflow = StateGraph(AgentState)
 
-print("WorkFlow 생성 완료!! ^^; b")
+    # 1. 'worker' 노드들을 그래프에 추가합니다.
+    # 각 노드는 (노드 이름, 실행할 함수) 형태로 추가됩니다.
+    workflow.add_node("initial_classifier", initial_classifier)
+    workflow.add_node("instructor", instructor)
+    workflow.add_node("decide_after_instructor", decide_after_instructor)
+    workflow.add_node("tester", tester)
+    workflow.add_node("decide_after_tester", decide_after_tester)
+
+    # 2. 라우터를 조건부 "진입점"으로 설정합니다.
+    # route_tasks 함수의 반환값에 따라 시작 노드가 결정됩니다.
+    workflow.set_conditional_entry_point(
+        route_tasks,
+        {
+            "initial_classifier": "initial_classifier",
+            "instructor": "instructor",
+            "tester": "tester",
+        }
+    )
+
+    # 3. 노드 간의 엣지(연결)를 정의합니다.
+    
+    # initial_classifier는 진입점에서 직접 호출되므로, 별도의 출발 엣지가 필요 없습니다.
+    # initial_classifier 실행 후에는 상태가 업데이트되고, 다음 `invoke` 시 `route_tasks`가 
+    # 'instructor'나 'tester'로 라우팅을 결정합니다.
+    # (원본 코드에서는 이 부분에 대한 명시적 엣지가 없었고, 이것이 올바른 설계입니다.)
+    
+    # instructor 노드 실행 후에는 항상 decide_after_instructor 노드로 이동합니다.
+    workflow.add_edge("instructor", "decide_after_instructor")
+    
+    # tester 노드 실행 후에는 항상 decide_after_tester 노드로 이동합니다.
+    workflow.add_edge("tester", "decide_after_tester")
+
+    # 결정자 노드(decide_after_instructor, decide_after_tester)는 상태만 업데이트합니다.
+    # 이 노드들 다음에는 명시적인 엣지가 없습니다.
+    # 대신 상태가 업데이트된 후, 다음 `invoke`가 들어올 때 다시 `route_tasks` 진입점을
+    # 통해 다음 작업 노드('instructor' 또는 'tester')가 결정됩니다.
+    # 세션이 종료('session_finished' == True)되면, END로 라우팅하는 로직은 
+    # conditional entry point 또는 별도의 라우터에서 처리할 수 있으나,
+    # 현재 구조에서는 사용자의 다음 입력이 없을 때 자연스럽게 종료됩니다.
+
+    return workflow
+
+# --- 워크플로우 컴파일 ---
+# 1. PostgreSQL 데이터베이스 연결 정보 설정
+# Django의 settings.py나 OS 환경 변수에서 연결 문자열을 가져옵니다.
+conn_string = os.environ.get("POSTGRES_CONNECTION_STRING")
+if not conn_string:
+    raise ValueError("POSTGRES_CONNECTION_STRING 환경 변수가 설정되지 않았습니다. 예: 'postgresql+psycopg2://user:pass@host:port/dbname'")
+
+# 2. PostgresSaver 인스턴스 생성 (암호화 serde 인자 없이)
+checkpointer = PostgresSaver.from_conn_string(conn_string)
+
+# 3. 데이터베이스 테이블 확인 및 생성
+# LangGraph가 상태를 저장하는 데 필요한 테이블을 확인하고, 없으면 생성합니다.
+# 애플리케이션이 시작될 때 한 번만 호출하면 됩니다.
+checkpointer.setup()
+print("✅ workflow.py: 데이터베이스 체크포인터 테이블 설정을 확인/완료했습니다.")
+
+# 4. 워크플로우 그래프 생성 및 컴파일
+# checkpointer를 연결하여 대화 상태가 DB에 저장되도록 합니다.
+simon_graph = create_workflow()
+simon_agent = simon_graph.compile(checkpointer=checkpointer)
+
+print("✅ workflow.py: LangGraph 워크플로우 생성 및 PostgreSQL checkpointer로 컴파일 완료.")

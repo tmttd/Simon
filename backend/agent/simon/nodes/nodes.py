@@ -1,249 +1,234 @@
-from typing import TypedDict, Sequence, Annotated, Optional, Literal
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
+# --- 표준 라이브러리 및 외부 라이브러리 임포트 ---
+from typing import Annotated, TypedDict, Optional, List, Union, Literal
+from pydantic import BaseModel, Field
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph.message import add_messages
 
-# 생성 순서: 
+# --- 로컬 모듈 임포트 ---
+# 설정 파일에서 LLM 모델들을 가져옵니다.
+from simon.settings import gemini_flash_8, gpt_5_mini
+# 유틸리티 함수를 가져옵니다.
+from simon.utils import prepare_contents
+# 프롬프트 템플릿들을 가져옵니다.
+from simon.nodes.prompts import (
+    INITIAL_CLASSIFIER_PROMPT,
+    INSTRUCTOR_PROMPT,
+    DECIDE_AFTER_INSTRUCTOR_PROMPT,
+    TESTER_PROMPT,
+    DECIDE_AFTER_TESTER_PROMPT,
+)
 
-#  0. 모든 agent가 공유할 AgentState의 스키마 정의
-#  1. prompt 정의
-#  2. 모델 생성(필요시 bind_tools까지)
-#  3. (필요시) PydanticOutputParser 구성
-#  4. (1), (2), (3)을 묶는 chain 생성
-#  5. chain을 실행하는 함수 생성
+# --- Pydantic 데이터 모델 정의 ---
 
-from .prompts import triage_prompt, information_prompt, factor_prompt, answering_prompt
-from .prompts import factor_parser
-from ..utils import prepare_context_data
-from ..tools import nutrition_retriever_tool, insulin_calculation
-from ..settings import LLM_MODEL_NAME, THINKING_MODEL_NAME, TEMPERATURE
+class LearningPath(BaseModel):
+    """개별 학습 경로(세션)의 구조를 정의합니다."""
+    title: str = Field(description="복습 세션의 핵심 주제를 하나의 구로 요약하는 제목. 순서에 따라 1, 2, 3, 4, 5 등 번호를 매길 것. ex) 대명사의 이해")
+    completed: bool = Field(default=False, description="해당 학습 경로의 완료 여부")
 
+class LearningPaths(BaseModel):
+    """전체 학습 커리큘럼의 구조를 정의합니다."""
+    subject: str = Field(description="모든 복습 세션의 핵심 주제를 요약한 짦은 한 문장.")
+    learning_paths: List[LearningPath] = Field(description="사용자의 요청 및 입력을 바탕으로 추출된 복습 세션들의 목록")
+    initial_message: str = Field(description="""환영 인사 및 해당 복습 세션 시작을 알리는 최초 메세지. 환영 인사와 함께 현재 세션의 주제를 언급하고, '준비되셨으면 "시작"이라고 입력해주세요'라는 문구로 반드시 마무리할 것.""")
+    completed: bool = Field(default=False, description="전체 커리큘럼의 완료 여부")
 
-# 노드 전체가 공유할 데이터의 스키마인 state 설정
+class InstructorDecision(BaseModel):
+    """'instructor'의 다음 행동을 결정합니다."""
+    next_action: Literal["continue_explaining", "move_to_quiz"] = Field(
+        description="설명이 충분하여 퀴즈로 넘어갈 준비가 되면 'move_to_quiz'를, 설명이나 질문/답변이 더 필요하면 'continue_explaining'을 선택하세요."
+    )
+
+class TesterDecision(BaseModel):
+    """'tester'의 다음 행동을 결정합니다."""
+    next_action: Literal["continue_quiz", "finish_path"] = Field(
+        description="학생이 정답을 맞혔고 다음 단계로 넘어갈 준비가 되면 'finish_path'를, 퀴즈가 아직 진행 중이거나 오답에 대한 피드백이 필요하면 'continue_quiz'를 선택하세요."
+    )
+
+# --- LangGraph 상태(State) 정의 ---
+
 class AgentState(TypedDict):
-    # 사용자와 모델의 대화 history
-    messages: Annotated[Sequence[BaseMessage], add_messages]
+    """LangGraph 워크플로우 전체에서 공유되는 상태 객체입니다."""
+    # 사용자 초기 입력
+    files: Optional[List[Union[str, bytes]]]
+    user_text: Optional[str]
 
-    # 대화 모드
-    dialogue_mode: Optional[str]
-
-    # 각종 보정 계수들
-    factors: Optional[dict]
-
-    # 최종 계산된 인슐린
-    calculation_result: Optional[str]
-
-    # 정보 수집 상태
-    information_state: Optional[Literal["complete", "ongoing"]]
-
-    # 음식 영양 성분
-    nutrition_facts: Optional[dict]
-
-
-# 모델 생성
-llm = ChatGoogleGenerativeAI(
-    model=LLM_MODEL_NAME,
-    temperature=TEMPERATURE
-)
-
-# 1. 분류 노드 생성을 위한 파츠(triage_node)
-# triage 에이전트 생성
-triage_agent = triage_prompt | llm
-
-# triage 에이전트 생성 함수 생성(=노드)
-def call_triage_agent(state: AgentState):
-    """사용자의 입력을 받아 의도를 세 가지(식사 인슐린 계산, 교정 인슐린 계산, 일반 질문) 중 하나로 분류합니다."""
+    # 전체 대화 기록 (add_messages는 새 메시지를 기존 리스트에 추가)
+    messages: Annotated[list, add_messages]
     
-    last_message = state['messages'][-1]
+    # 전체 학습 계획 (전체 세션의 "Source of Truth")
+    full_curriculum: Optional[LearningPaths]
 
-    output = triage_agent.invoke(
-        {"messages": [last_message]}
-        )
+    # 현재 실행 중인 LearningPath의 인덱스
+    current_path_index: int
 
-    return {"dialogue_mode": output.content}
+    # 현재 작업 (instruct, test)
+    current_task: str
 
-# 대화 mode에 따라 분기를 설정하는 함수
-# workflow.py에서 conditional_edge에 사용됩니다.
-def set_mode(state:AgentState) -> str:
+    # 세션 완전 종료 여부 플래그
+    session_finished: bool
 
-    if state['dialogue_mode']:
-        return state['dialogue_mode']
-    else:
-        return 'end'
+
+# --- LangGraph 노드(Node) 함수 정의 ---
+
+def initial_classifier(state: AgentState) -> dict:
+    """사용자의 최초 입력을 받아 전체 커리큘럼을 생성하고 상태를 초기화합니다."""
+    print("--- 노드 실행: initial_classifier ---")
+
+    # 체인 구성: 프롬프트와 Pydantic 출력을 지원하는 LLM 연결
+    chain = INITIAL_CLASSIFIER_PROMPT | gemini_flash_8.with_structured_output(LearningPaths)
+
+    # 사용자 입력 처리 및 HumanMessage 생성
+    initial_files = state.get("files")
+    initial_user_text = state.get("user_text")
+    user_contents = prepare_contents(initial_files, initial_user_text)
+    user_message = HumanMessage(content=user_contents)
+
+    # 체인 실행
+    pydantic_response = chain.invoke({"user_input_message_content": [user_message]})
     
-# 그래프 진입점을 dialogue_mode에 따라 선택하는 함수
-def entry_point_routing(state:AgentState) -> str:
-    """그래프의 진입점을 선택합니다. 상태의 dialogue_mode가 None일 경우 triage_node로, meal이나 correction이면 information_node로
-    query면 agent_node로"""
-
-    if not state.get('dialogue_mode'):
-        return 'triage_node'
-    elif state['dialogue_mode'] in ["meal", "correction"]:
-        return "information_node"
-    else:
-        return "answer_node"
-
-    
-
-# 2. 정보 수집 노드를 위한 파츠(information_node)
-information_agent = information_prompt | llm.bind_tools([nutrition_retriever_tool])
-
-# call_information_agent 함수 생성
-def call_information_agent(state:AgentState):
-
-    output = information_agent.invoke({
-        "messages": state['messages']
-    })
-
-    if "완료" in output.content:
-        return {"information_state": "complete", "messages": [output]}
-    
-    else:
-        return {"messages": [output]}
-
-# 정보 수집 루프를 계속할지 결정하는 함수
-# workflow.py에서 conditional_edge에 사용됩니다.
-def continue_information_gathering(state:AgentState) -> str:
-    last_message = state['messages'][-1]
-
-    # 도구를 호출했다면 당연히 한 번 더 진행.
-    # AIMessage인지 확인하고 tool_calls가 있는지 확인
-    if isinstance(last_message, AIMessage) and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        return "nutrition"
-    
-    elif state.get('information_state') == "complete":
-        return "complete"
-    
-    else:
-        return "continue"
-        
-    
-# 3. 계수 설정 노드를 위한 파츠(factor_node)
-# factor_agent 객체를 생성합니다.
-factor_agent = (
-    factor_prompt 
-    | llm
-    | factor_parser
-)
-
-# factor_agent 호출 함수를 생성합니다.
-def call_factor_agent(state:AgentState):
-    """state의 모든 대화 기록을 제공하여 필요한 보정 계수들을 생성하는 함수입니다."""
-
-    # 1. 컨텍스트 데이터 준비
-    context_data = prepare_context_data()
-
-    # 2. 메시지 필터링
-    all_messages = state.get('messages') # .get()을 사용해 더 안전하게 접근
-
-    # all_messages가 None인지 확인
-    if all_messages is None:
-        # 임시로 빈 리스트를 할당하여 오류를 피하게 할 수 있습니다.
-        all_messages = [] 
-
-    messages_for_llm = [
-        msg for msg in all_messages
-        if not (isinstance(msg, AIMessage) and msg.content.strip().lower() == "complete")
-    ]
-
-    # 3. LLM 입력 데이터 구성
-    input_data = {
-        "messages": messages_for_llm,
-        "time": context_data.get('time'),
-        "blood_sugar": context_data.get('blood_sugar'),
-        "iob": context_data.get('iob')
-    }
-
-    # 4. LLM 호출 및 결과 확인
-    try:
-        output = factor_agent.invoke(input_data)
-    except Exception as e:
-        raise e # 오류를 다시 발생시켜서 실행을 중단합니다.
-
-    # 5. 최종 반환값 확인
-    result = {"factors": output.dict()}
-    return result
-
-# 4. 최종 답변 생성 노드를 위한 파츠(answer_node)
-answering_agent = answering_prompt | llm
-
-# 에이전트 호출 함수
-def call_answering_agent(state:AgentState) -> dict:
-    """
-    지금까지 수집된 모든 정보(대화, 계수, 계산결과)를 종합하여
-    사용자에게 보여줄 최종 답변을 생성합니다.
-    """
-    print("--- 최종 답변 생성 중 ---")
-    
-    # 상태에서 필요한 모든 정보를 추출합니다.
-    factors = state.get('factors', {})
-    calculation_result = state.get('calculation_result', "계산 결과를 찾을 수 없습니다.")
-    
-    # LLM에게 전달할 입력 데이터를 구성합니다.
-    # 딕셔너리인 factors를 문자열로 변환하여 LLM이 쉽게 읽도록 합니다.
-    input_data = {
-        "messages": state['messages'],
-        "factors": str(factors),
-        "calculation_result": calculation_result
-    }
-
-    # Answering Agent를 호출하여 최종 답변을 생성합니다.
-    final_answer = answering_agent.invoke(input_data)
-
-    # 생성된 답변을 대화 기록에 추가합니다.
-    return {"messages": [final_answer]}
-
-
-# 5. 영양 성분 검색 노드를 위한 파츠
-def call_nutirion_agent(state:AgentState):
-
-    last_message = state['messages'][-1]
-
-    # AIMessage이고 tool_calls가 있는지 확인
-    if not isinstance(last_message, AIMessage) or not hasattr(last_message, 'tool_calls') or not last_message.tool_calls:
-        raise ValueError("Expected AIMessage with tool_calls")
-
-    tool_args = last_message.tool_calls[0]['args']
-
-    result = nutrition_retriever_tool.invoke(tool_args)
-
+    print("-> initial_classifier: 커리큘럼 생성 완료.")
     return {
-        "messages": 
-        [ToolMessage(
-            content=str(result), 
-            tool_call_id=last_message.tool_calls[0]['id'])
-        ]}
+        "full_curriculum": pydantic_response,
+        "current_path_index": 0,
+        "current_task": "instruct",
+        "session_finished": False,
+        "messages": [user_message, AIMessage(content=pydantic_response.initial_message)],
+    }
 
+def instructor(state: AgentState) -> dict:
+    """'튜터' LLM이 현재 학습 경로에 대한 설명을 생성합니다."""
+    print("--- 노드 실행: instructor ---")
 
-# 6. 최종 인슐린 용량 계산을 위한 노드의 파츠
-def call_insulin_agent(state: AgentState) -> dict:
-    """
-    state['factors']에 준비된 모든 인자를 사용하여 insulin_calculation 도구를 호출하고
-    결과를 calculation_result에 저장합니다.
-    """
+    path_idx = state['current_path_index']
+    curriculum = state['full_curriculum']
+    current_path = curriculum.learning_paths[path_idx]
+    all_paths_str = "\n".join(f"- {i+1}. {c.title} {'(현재 학습 중)' if i == path_idx else ''}" for i, c in enumerate(curriculum.learning_paths))
+
+    # 체인 구성: 프롬프트, LLM, 문자열 출력 파서 연결
+    explanation_chain = INSTRUCTOR_PROMPT | gemini_flash_8 | StrOutputParser()
+
+    # 체인 실행
+    ai_response_text = explanation_chain.invoke({
+        "task": state.get("current_task", "instruct"),
+        "all_paths": all_paths_str,
+        "subject": curriculum.subject,
+        "path_title": current_path.title,
+        "messages": state["messages"],
+    })
     
-    # 1. Factor_agent가 준비한 모든 인자를 가져옵니다.
-    calculation_args = state.get('factors')
+    print(f"-> instructor: '{current_path.title}'에 대한 설명 생성 완료.")
+    return {"messages": [AIMessage(content=ai_response_text)]}
+
+def decide_after_instructor(state: AgentState) -> dict:
+    """instructor의 설명을 바탕으로 다음 행동(추가 설명 or 퀴즈)을 결정합니다."""
+    print("--- 노드 실행: decide_after_instructor ---")
+
+    # 체인 구성: 결정자 프롬프트와 Pydantic 출력을 지원하는 LLM 연결
+    classifier_chain = DECIDE_AFTER_INSTRUCTOR_PROMPT | gpt_5_mini.with_structured_output(InstructorDecision)
     
-    if not calculation_args:
-        # 혹시 모를 예외 처리
-        return {"calculation_result": "오류: 계산에 필요한 정보가 준비되지 않았습니다."}
+    # 체인 실행
+    decision = classifier_chain.invoke({"messages_for_classification": state["messages"]})
+    
+    next_task = "test" if decision.next_action == "move_to_quiz" else "instruct"
+    
+    if next_task == "test":
+        print("-> 결정자(instructor): 설명 완료. 다음 작업을 'test'로 설정합니다.")
+    else:
+        print("-> 결정자(instructor): 추가 설명 필요. 다음 작업을 'instruct'로 유지합니다.")
+
+    return {"current_task": next_task}
+
+def tester(state: AgentState) -> dict:
+    """'튜터' LLM이 퀴즈를 진행하고 학생의 답변을 평가합니다."""
+    print("--- 노드 실행: tester ---")
+    
+    path_idx = state["current_path_index"]
+    curriculum = state['full_curriculum']
+    current_path = curriculum.learning_paths[path_idx]
+
+    next_path_idx = path_idx + 1
+    next_path_title = "없음 (이번이 마지막 학습입니다)"
+    if next_path_idx < len(curriculum.learning_paths):
+        next_path_title = curriculum.learning_paths[next_path_idx].title
+
+    # 체인 구성
+    tutor_chain = TESTER_PROMPT | gemini_flash_8 | StrOutputParser()
+    ai_response_text = tutor_chain.invoke({
+        "current_path_topic": current_path.title,
+        "next_path_topic": next_path_title,
+        "messages": state["messages"],
+    })
+    
+    print(f"-> tester: '{current_path.title}'에 대한 퀴즈 진행/피드백 생성 완료.")
+    
+    # 세션이 종료된 경우 최종 메시지를 추가합니다.
+    if state.get("session_finished"):
+        final_message = ai_response_text + "\n\n축하합니다! 모든 학습 내용을 성공적으로 마치셨습니다. 이번 학습 세션을 종료하겠습니다."
+        return {"messages": [AIMessage(content=final_message)]}
+    else:
+        return {"messages": [AIMessage(content=ai_response_text)]}
+
+def decide_after_tester(state: AgentState) -> dict:
+    """tester의 퀴즈 진행 상황을 바탕으로 다음 행동(퀴즈 계속 or 다음 경로)을 결정합니다."""
+    print("--- 노드 실행: decide_after_tester ---")
+
+    path_idx = state["current_path_index"]
+    curriculum = state['full_curriculum']
+
+    # 체인 구성
+    classifier_chain = DECIDE_AFTER_TESTER_PROMPT | gpt_5_mini.with_structured_output(TesterDecision)
+    decision = classifier_chain.invoke({"messages_for_classification": state["messages"]})
+    
+    if decision.next_action == "finish_path":
+        current_path_title = curriculum.learning_paths[path_idx].title
+        print(f"-> 결정자(tester): 테스트 완료. '{current_path_title}' 학습을 완료 처리합니다.")
         
-    # 2. 'insulin_calculation' 도구를 ** (언패킹)을 사용하여 호출합니다.
-    #    이렇게 하면 딕셔너리의 키가 함수의 파라미터 이름과 일치하여 자동으로 매핑됩니다.
-    result_string = insulin_calculation.invoke(calculation_args)
+        # 현재 학습 경로 완료 처리
+        # Pydantic 모델은 불변(immutable)이므로 직접 수정하는 대신 복사본을 만들어 업데이트
+        updated_curriculum = curriculum.copy(deep=True)
+        updated_curriculum.learning_paths[path_idx].completed = True
+        
+        next_path_idx = path_idx + 1
+        
+        if next_path_idx < len(curriculum.learning_paths):
+            next_path_title = curriculum.learning_paths[next_path_idx].title
+            print(f"-> 다음 학습 경로 '{next_path_title}'(으)로 이동합니다.")
+            return {
+                "full_curriculum": updated_curriculum,
+                "current_path_index": next_path_idx,
+                "current_task": "instruct",
+            }
+        else:
+            print("-> 모든 학습 경로가 완료되었습니다. 세션을 종료합니다.")
+            updated_curriculum.completed = True
+            return {
+                "full_curriculum": updated_curriculum,
+                "session_finished": True,
+            }
+    else: # continue_quiz
+        print("-> 결정자(tester): 테스트 계속 진행. 다음 작업을 'test'로 유지합니다.")
+        return {"current_task": "test"}
+
+# --- 라우터(Router) 함수 정의 ---
+
+def route_tasks(state: AgentState) -> str:
+    """AgentState를 기반으로 다음에 실행할 노드를 결정합니다."""
+    print("--- 라우터(route_tasks) 실행 ---")
+
+    if "full_curriculum" not in state or state["full_curriculum"] is None:
+        print("-> 라우팅: initial_classifier")
+        return "initial_classifier"
     
-    # 3. 결과를 상태에 저장합니다.
-    return {"calculation_result": result_string}
+    task = state.get("current_task")
+    if task == "instruct":
+        print("-> 라우팅: instructor")
+        return "instructor"
+    elif task == "test":
+        print("-> 라우팅: tester")
+        return "tester"
+    else:
+        print(f"-> 경고: 예상치 못한 작업({task})입니다. instructor로 라우팅합니다.")
+        return "instructor"
 
-
-# 7. 모든 해결 과정을 종결하는 초기화 노드의 파츠
-# 문제가 해결되면 dialogue_mode를 None으로 초기화합니다.
-def call_cleanup_node(state: AgentState) -> dict:
-    """
-    하나의 작업 사이클이 끝났을 때, 다음 대화를 위해 상태를 초기화합니다.
-    구체적으로 dialogue_mode를 None으로 설정합니다.
-    """
-    print("--- A task cycle is complete. Cleaning up state. ---")
-    return {"dialogue_mode": None}
+print("✅ nodes/nodes.py: 상태, Pydantic 모델, 노드, 라우터 함수 정의 로드 완료.")

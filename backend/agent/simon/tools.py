@@ -1,114 +1,56 @@
-from langchain_core.tools import tool
-from langchain_upstage import UpstageEmbeddings
-from langchain_chroma import Chroma
-from .settings import QUERY_EMBEDDING_MODEL_NAME, PERSIST_DIRECTORY, COLLECTION_NAME
+# import os
+# from langchain_upstage import UpstageEmbeddings
+# from langchain_chroma import Chroma
+# from langchain_core.documents import Document # 툴의 반환 타입 정의에는 직접 사용되지 않지만, 컨텍스트 상 필요할 수 있음
+# from langchain_core.tools import tool # tool 데코레이터를 import 합니다.
 
-# nutrition_retriever 정의
-query_embeddings = UpstageEmbeddings(model=QUERY_EMBEDDING_MODEL_NAME)
+# # settings.py에서 ChromaDB 경로를 임포트합니다.
+# from simon.settings import CHROMA_DB_PATH_UPSTAGE
 
-# vectorDB 로드
-vectorDB = Chroma(
-    persist_directory=PERSIST_DIRECTORY,
-    embedding_function=query_embeddings,
-    collection_name=COLLECTION_NAME
-)
+# # --- ChromaDB 및 검색 임베딩 모델 초기화 ---
+# # LangGraph 에이전트 외부에서 한 번만 초기화하도록 전역 변수로 설정합니다.
+# # 이 초기화 로직은 'tools.py' 모듈이 로드될 때 실행됩니다.
+# query_embeddings_for_retriever = None
+# vectorstore_for_retriever = None
 
-# retrievr 객체 생성
-nutrition_retriever = vectorDB.as_retriever(search_kwargs={'k':3})
+# if "UPSTAGE_API_KEY" in os.environ and os.path.exists(CHROMA_DB_PATH_UPSTAGE):
+#     try:
+#         query_embeddings_for_retriever = UpstageEmbeddings(model="solar-embedding-1-large-query")
+#         vectorstore_for_retriever = Chroma(
+#             persist_directory=CHROMA_DB_PATH_UPSTAGE,
+#             embedding_function=query_embeddings_for_retriever
+#         )
+#         print(f"✅ tools.py: ChromaDB 및 검색 임베딩 모델이 '{CHROMA_DB_PATH_UPSTAGE}'에서 로드되었습니다.")
+#     except Exception as e:
+#         print(f"❌ tools.py: ChromaDB 로드 중 오류 발생: {e}")
+#         vectorstore_for_retriever = None # 오류 발생 시 retriever 사용 불가 상태 표시
+# else:
+#     print("❌ tools.py: 'UPSTAGE_API_KEY'가 없거나 ChromaDB 경로가 유효하지 않아 retriever를 로드할 수 없습니다.")
+#     vectorstore_for_retriever = None # retriever 사용 불가 상태 표시
 
-# RAG health_Check
-print(nutrition_retriever.invoke("삽겹살 구이"))
-
-# tools(도구 가방)
-tools = []
-
-# Document Retriever 도구(영양 성분 쿼리)
-# 추후에 BM25와 결합한 Hybrid Retriever로 바꿀 필요 있음.
-@tool
-def nutrition_retriever_tool(query: str) -> str:
-    """
-    음식의 영양 정보를 확인할 때 사용합니다.
-    '짬뽕', '김치볶음밥', '포도'과 같은 음식 이름 또는 원재료명이 들어왔을 때 사용합니다.
-    100g 기준값이므로, 1인분용량에 맞게 곱해서 적절히 사용합니다.
-    """
-
-    datas = nutrition_retriever.invoke(query)
-
-    if not datas:
-        return "검색 결과, 해당 음식에 대한 정보를 찾을 수 없습니다."
+# @tool
+# def document_retriever(query: str) -> str:
+#     """
+#     사용자의 질문과 관련된 한국어 문법 문서(Chunk)를 검색합니다.
+#     주어진 'query'에 가장 관련성이 높은 'k'개의 문서 텍스트를 반환합니다.
+#     검색 결과는 한국어 문법에 대한 설명이나 예시를 포함할 수 있습니다.
+#     """
+#     if vectorstore_for_retriever is None:
+#         return "문서 검색 시스템이 초기화되지 않았습니다. 관리자에게 문의해주세요."
     
-    formatted_results = []
+#     print(f"--- Tool Call: document_retriever 실행 (쿼리: '{query}') ---")
+#     retrieved_docs = vectorstore_for_retriever.similarity_search(query, k=5)
+    
+#     if not retrieved_docs:
+#         print(f"--- Tool Call: document_retriever 결과: 관련 문서 없음 ---")
+#         return "죄송합니다. 관련 문서를 찾을 수 없습니다."
 
-    for data in datas:
-        food_name = data.metadata.get('식품명', '')
-        carbs = data.metadata.get('탄수화물(g)', '')
-        protein = data.metadata.get('단백질(g)', '')
-        fat = data.metadata.get('지방(g)', '')
-        standard_weight = data.metadata.get('기준량', '정보없음')
-        serving_weight = data.metadata.get('1인분용량', '정보없음')
-        # 계산의 정확도를 죽이는 듯.
-        # one_weight = data.metadata.get('개당용량', '정보없음')
-
-        result_str = f"""
-음식명: {food_name}
-탄수화물: {carbs}, 단백질: {protein}, 지방: {fat}
-기준량: {standard_weight}, 1인분용량: {serving_weight}
-"""
-        formatted_results.append(result_str)
+#     # 검색된 문서 내용을 하나의 문자열로 결합
+#     formatted_docs = []
+#     for i, doc in enumerate(retrieved_docs):
+#         # 문서 내용 앞에 출처 정보를 추가
+#         source_info = f"[[문서 출처: {doc.metadata.get('source', '알 수 없음')}, Chunk Index: {doc.metadata.get('chunk_index', '알 수 없음')}]]"
+#         formatted_docs.append(f"{source_info}\n{doc.page_content.strip()}")
         
-    return "\n\n".join(formatted_results)
-
-tools.append(nutrition_retriever_tool)
-
-
-# 2. 인슐린 계산 함수를 만들어 도구로 제공합니다.
-@tool
-def insulin_calculation(
-    carbs: float = 0,
-    blood_sugar: float = 120, 
-    iob: float = 0, 
-    exercise_factor: float = 1.0,
-    morning_factor: float = 1.0,
-    stress_factor: float = 1.0,
-    ill_factor: float = 1.0,
-    ) -> str:
-    """
-    사용자와의 대화를 통해 모든 정보 수집과 상황 판단이 끝났을 때, 
-    결정된 보정 계수(factor)들을 이용해 최종 인슐린 용량을 '계산'만 할 때 사용하는 도구입니다.
-    예를 들어, 운동으로 20% 감량이 필요하다고 판단되면 exercise_factor=0.8을 인자로 넣어 호출해야 합니다.
-    모든 factor의 기본값은 1.0 (영향 없음)입니다.
-    """
-
-    ICR = 6.5
-    CF = 35
-    target = 120
-
-
-    if carbs > 0:
-        meal_bolus = round(carbs / ICR)
-    else:
-        meal_bolus = 0
-
-    if blood_sugar >= 155:
-        treatment_bolus = round((blood_sugar-target) / CF)
-    else:
-        treatment_bolus = 0
-
-    if (meal_bolus + treatment_bolus - iob) <= 0:
-        temp_total_bolus = 0
-    else:
-        temp_total_bolus = (meal_bolus + treatment_bolus - iob)
-
-    # 각종 계수에 따른 보정
-    final_total_bolus = temp_total_bolus * exercise_factor * morning_factor * stress_factor * ill_factor
-
-
-    response = f"""계산 결과:
-기본 인슐린: {temp_total_bolus} 단위 (식사량, 현재 혈당, IOB 고려)
-- 적용된 보정 계수: 운동({exercise_factor}), 아침({morning_factor}), 스트레스({stress_factor}), 질병({ill_factor})
-최종 권장 인슐린: {round(final_total_bolus, 1)} 단위
-"""
-    
-    return response
-
-tools.append(insulin_calculation)
+#     print(f"--- Tool Call: document_retriever 결과: {len(retrieved_docs)}개의 문서 검색됨 ---")
+#     return "\n\n---\n\n".join(formatted_docs)
