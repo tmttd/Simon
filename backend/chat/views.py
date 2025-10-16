@@ -6,7 +6,6 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .ai_connector import get_ai_response
 from .models import ChatMessage, Thread, StudyGroup
-from agent.simon.initial_classifier.main import initiate_learning_session
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Count, Q
 
@@ -14,6 +13,7 @@ from django.db.models import Count, Q
 class ChatAgentView(APIView):
     """사용자의 채팅 메시지를 받아 AI의 응답을 반환합니다."""
     permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs) -> Response:
         user_message = request.data.get('message')
@@ -51,6 +51,16 @@ class ChatAgentView(APIView):
                 title = user_message[:20]
                 thread = Thread.objects.create(user=request.user, title=title, group=group)
 
+            # 첫 턴 여부 계산: 해당 스레드의 기존 메시지 존재 여부로 판단
+            is_first_turn = not ChatMessage.objects.filter(thread=thread).exists()
+
+            # 첫 턴에 업로드된 파일 있으면 바이트 리스트로 수집
+            files = None
+            if is_first_turn:
+                upload_list = request.FILES.getlist('files')
+                if upload_list:
+                    files = [f.read() for f in upload_list]
+
             ChatMessage.objects.create(
                 user=request.user,
                 thread=thread,
@@ -59,7 +69,7 @@ class ChatAgentView(APIView):
             )
 
             start_time = timezone.now()
-            ai_response = get_ai_response(user_message, str(thread.id))
+            ai_response = get_ai_response(user_message, str(thread.id), is_first_turn=is_first_turn, files=files)
             end_time = timezone.now()
             response_duration = (end_time - start_time).total_seconds()
 
