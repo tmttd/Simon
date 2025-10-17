@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { classifyStudy } from "../../api/apiClient";
-import styles from "./InitStudy.module.css";
+import styles from "./Start.module.css";
 
-export default function InitStudy() {
+export default function Start() {
   const navigate = useNavigate();
   const [noteText, setNoteText] = useState("");
   const [files, setFiles] = useState([]);

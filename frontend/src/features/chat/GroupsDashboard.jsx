@@ -59,7 +59,7 @@ export default function GroupsDashboard() {
             <h1 className={styles.title}>Simon 학습 대시보드</h1>
           </div>
           <div className={styles.topActions}>
-            <button className={styles.primaryBtn} onClick={() => navigate('/init-study')}>+ 새 학습 세션</button>
+            <button className={styles.primaryBtn} onClick={() => navigate('/start')}>+ 새 학습 세션</button>
           </div>
         </div>
       {isLoading && <div className={styles.hint}>로딩 중…</div>}

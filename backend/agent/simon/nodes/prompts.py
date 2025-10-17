@@ -48,7 +48,7 @@ DECIDE_AFTER_INSTRUCTOR_PROMPT = ChatPromptTemplate.from_messages([
     'instruct'(설명) 작업이 끝났는지 판단해야 합니다.
     대화 기록을 보고, AI가 퀴즈로 넘어가려고 한다면 'move_to_quiz'로, 설명 중이거나 사용자의 의사를 물어보는 단계라면 'continue_explaining'으로 결정하세요.
     만약 AI가 사용자에게 '이해되셨나요? 다른 질문은 없을까요?'라는 식으로 되묻는다면 이는 여전히 설명이 진행중인 것이므로 'continue_explaining'으로 결정해야 합니다. 
-    그외에 '확인 문제(퀴즈)로 넘어갈까요?', '퀴즈 시작' 등 퀴즈를 명시적으로 말했을 경우에는 'move_to_quiz'로 결정하세요.
+    **(강조!!)AI가 '확인 문제(퀴즈)로 넘어갈까요?', '퀴즈 시작' 등 퀴즈를 명시적으로 말했을 경우에만** 'move_to_quiz'로 결정하세요.
     """),
     MessagesPlaceholder(variable_name="messages_for_classification")
 ])

@@ -32,8 +32,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   const isNewChat = !threadId;
   const isBusy = isSending || isFetchingHistory;
 
-  // 초기 렌더링 상태인지 판단 (애니메이션 클래스 적용 기준)
-  const isInitialView = isNewChat && messages.length === 0;
+  
 
   const getStatusKey = (tid) => (tid == null ? "__new__" : tid);
 
@@ -456,46 +455,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     </form>
   );
 
-  if (isInitialView) {
-    return (
-      <div className={`${styles.window} ${styles.initialLayout}`}>
-        <header className={styles.header}>
-          <button className={styles.mobileMenuBtn} onClick={onOpenMenu} aria-label="Open menu" />
-          <div className={styles.brand}>
-            <img
-              src="/simon_logo_32.png"
-              srcSet="/simon_logo_32.png 1x, /simon_logo_64.png 2x, /simon_logo_96.png 3x"
-              alt="Simon logo"
-              className={styles.logo}
-            />
-            <div>
-              <h1 className={styles.title}>Simon says</h1>
-              <p className={styles.subtitle}>
-                {user?.email
-                  ? `${user.username || (user.first_name && user.last_name ? `${user.last_name}${user.first_name}` : user.email)}님, 안녕하세요!`
-                  : "무엇이든 물어보세요!"}
-              </p>
-            </div>
-          </div>
-          <button onClick={logout} className={styles.logoutBtn}>
-            로그아웃
-          </button>
-        </header>
-        <div className={styles.initialMain}>
-          <div className={styles.welcome}>
-            <img
-              src="/simon_logo_48.png"
-              srcSet="/simon_logo_48.png 1x, /simon_logo_96.png 2x, /simon_logo_144.png 3x"
-              alt="Simon logo"
-              className={styles.logoLarge}
-            />
-            <h1 className={styles.title}>무엇이든 물어보세요!</h1>
-          </div>
-          {chatForm}
-        </div>
-      </div>
-    );
-  }
+  
 
   return (
     <div className={styles.window}>
