@@ -16,6 +16,10 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
+  const [pendingUserText, setPendingUserText] = useState(null);
+  const [fadeOutOldPair, setFadeOutOldPair] = useState(false);
+  const [visiblePair, setVisiblePair] = useState({ userText: null, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: false });
+  const fadeOutTimeoutRef = useRef(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
   const requestStartTimeRef = useRef(null);
@@ -35,6 +39,26 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   
 
   const getStatusKey = (tid) => (tid == null ? "__new__" : tid);
+
+  const getLatestPairFrom = (arr) => {
+    if (!Array.isArray(arr) || arr.length === 0) return { userText: null, aiText: null, aiDuration: 0 };
+    let aiIndex = -1;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const m = arr[i];
+      if (m.sender === "ai" && (m.text || "").length > 0) { aiIndex = i; break; }
+    }
+    if (aiIndex === -1) return { userText: null, aiText: null, aiDuration: 0 };
+    let userIndex = -1;
+    for (let j = aiIndex - 1; j >= 0; j--) {
+      const m = arr[j];
+      if (m.sender === "user") { userIndex = j; break; }
+    }
+    return {
+      userText: userIndex !== -1 ? (arr[userIndex].text || null) : null,
+      aiText: arr[aiIndex].text || null,
+      aiDuration: Number(arr[aiIndex].duration || 0),
+    };
+  };
 
   const updateThreadStatus = (tid, updates) => {
     const key = getStatusKey(tid);
@@ -110,6 +134,8 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
               isTyping: false,
             }));
           });
+          const pair = getLatestPairFrom(serverHistory);
+          setVisiblePair({ userText: pair.userText, aiText: pair.aiText, aiDuration: pair.aiDuration, fadeIn: false, aiIsIndicator: false });
 
           // 완료 판정: 마지막 항목이 ai이고 text가 존재하면 완료로 간주
           const last = serverHistory[serverHistory.length - 1];
@@ -133,11 +159,12 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     fetchHistory();
   }, [threadId, isNewChat]);
 
-  useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = mainRef.current.scrollHeight;
-    }
-  }, [messages, isBusy, error]);
+  // 자동 스크롤 비활성화 - 사용자가 직접 스크롤 위치 제어
+  // useEffect(() => {
+  //   if (mainRef.current) {
+  //     mainRef.current.scrollTop = mainRef.current.scrollHeight;
+  //   }
+  // }, [messages, isBusy, error]);
 
   useEffect(() => {
     if (!isSending) return;
@@ -196,7 +223,20 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
           isTyping: false,
           fadeIn: true,
         };
-        setMessages((prev) => [...prev, aiMessage]);
+        // 타이머가 아직 유효하면 취소 (페이드아웃 완료 후 인디케이터 세팅되는 타이밍이 응답과 경합하지 않게)
+        if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); fadeOutTimeoutRef.current = null; }
+
+        // messageText 파라미터를 사용 (상태값이 아닌 함수 호출 시점의 값 사용)
+        const currentUserText = messageText;
+        setMessages((prev) => {
+          const next = [...prev];
+          if (currentUserText) next.push({ sender: 'user', text: currentUserText });
+          next.push(aiMessage);
+          return next;
+        });
+        // visiblePair: 인디케이터에서 실제 응답으로 교체 + 페이드인
+        setFadeOutOldPair(false);
+        setVisiblePair({ userText: currentUserText, aiText: response.data.response, aiDuration: duration, fadeIn: true, aiIsIndicator: false });
 
         // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화)
         try {
@@ -215,6 +255,9 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
           skipHistoryForThreadRef.current = newThreadId;
           onNewThreadStart(newThreadId);
         }
+
+        // 응답 수신 후 오버레이 초기화
+        setPendingUserText(null);
       }
     } catch (err) {
       if (err.name === "CanceledError") {
@@ -331,8 +374,14 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     e.preventDefault();
     if (!input.trim() || isBusy) return;
 
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
+    setPendingUserText(input);
+    setFadeOutOldPair(true);
+    // 페이드아웃 후 새 쌍으로 교체
+    if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+    fadeOutTimeoutRef.current = setTimeout(() => {
+      setFadeOutOldPair(false);
+      setVisiblePair({ userText: input, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: true });
+    }, 450);
     executeSend(input, threadId);
     setInput("");
     // textarea 높이 초기화
@@ -349,8 +398,14 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
         e.preventDefault();
         if (!input.trim() || isBusy) return;
         
-        const userMessage = { sender: "user", text: input };
-        setMessages((prev) => [...prev, userMessage]);
+        setPendingUserText(input);
+        setFadeOutOldPair(true);
+        // 페이드아웃 후 새 쌍으로 교체
+        if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+        fadeOutTimeoutRef.current = setTimeout(() => {
+          setFadeOutOldPair(false);
+          setVisiblePair({ userText: input, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: true });
+        }, 450);
         executeSend(input, threadId);
         setInput("");
         // textarea 높이 초기화
@@ -379,6 +434,12 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    setPendingUserText(null);
+    setFadeOutOldPair(false);
+    if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+    // 이전 메시지 기록 기준으로 visiblePair 복구
+    const pair = getLatestPairFrom(messages);
+    setVisiblePair({ userText: pair.userText, aiText: pair.aiText, aiDuration: pair.aiDuration, fadeIn: false, aiIsIndicator: false });
   };
 
   const chatForm = (
@@ -441,37 +502,42 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
 
       <main ref={mainRef} className={styles.main}>
         <div className={styles.messageList}>
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`${styles.message} ${msg.fadeIn ? styles.fadeIn : ''} ${
-                msg.sender === "user" ? styles.userMessage : styles.aiMessage
-              }`}
-            >
+          {visiblePair.userText && (
+            <div className={`${styles.message} ${styles.userMessage} ${fadeOutOldPair ? styles.fadeOut : ''}`}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {msg.text}
+                {visiblePair.userText}
               </ReactMarkdown>
-              {msg.sender === "ai" && msg.duration > 0 && !msg.isTyping && (
-                <div className={styles.timer}>
-                  {msg.duration.toFixed(1)}s
-                </div>
-              )}
-            </div>
-          ))}
-          {isSending && pendingThreadIdRef.current === threadId && !isStreaming && requestStartTimeRef.current && (
-            <div className={`${styles.message} ${styles.aiMessage}`}>
-              <div className={styles.loadingContainer}>
-                <div className={styles.loadingDots}>
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                </div>
-                <div className={styles.timer}>
-                  {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
-                </div>
-              </div>
             </div>
           )}
+
+          <div className={`${styles.message} ${styles.aiMessage} ${(visiblePair.fadeIn && !fadeOutOldPair) ? styles.fadeIn : ''} ${fadeOutOldPair ? styles.fadeOut : ''}`}>
+            {visiblePair.aiIsIndicator || !visiblePair.aiText ? (
+              requestStartTimeRef.current ? (
+                <div className={styles.loadingContainer}>
+                  <div className={styles.loadingDots}>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                  </div>
+                  <div className={styles.timer}>
+                    {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
+                  </div>
+                </div>
+              ) : null
+            ) : (
+              <>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {visiblePair.aiText}
+                </ReactMarkdown>
+                {visiblePair.aiDuration > 0 && (
+                  <div className={styles.timer}>
+                    {visiblePair.aiDuration.toFixed(1)}s
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {error && (
             <div className={styles.errorMessage}>
               <span>{error.message}</span>

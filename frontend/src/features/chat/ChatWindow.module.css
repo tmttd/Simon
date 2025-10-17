@@ -130,6 +130,34 @@
   to { clip-path: inset(0 0 0 0); opacity: 1; }
 }
 
+/* 이전 쌍을 사라지게 하는 페이드 아웃 */
+.fadeOut {
+  opacity: 1;
+  animation: fadeOut .45s ease forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+/* 전송 중 우측 상단 사용자 메시지 오버레이 */
+.pendingUserBubble {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  z-index: 2;
+  max-width: 60%;
+}
+
+/* 전송 중 좌측 하단 로딩 인디케이터 오버레이 */
+.sendingIndicator {
+  position: absolute;
+  left: 20px;
+  bottom: 12px;
+  z-index: 2;
+}
+
 .userMessage {
   background: var(--brand);
   color: #fff;
