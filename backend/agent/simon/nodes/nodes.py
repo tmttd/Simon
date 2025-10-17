@@ -7,11 +7,11 @@ from langgraph.graph.message import add_messages
 
 # --- 로컬 모듈 임포트 ---
 # 설정 파일에서 LLM 모델들을 가져옵니다.
-from simon.settings import gemini_flash_8, gpt_5_mini
+from ..settings import gemini_flash_8, gpt_5_mini
 # 유틸리티 함수를 가져옵니다.
-from simon.utils import prepare_contents
+from ..utils import prepare_contents
 # 프롬프트 템플릿들을 가져옵니다.
-from simon.nodes.prompts import (
+from .prompts import (
     INITIAL_CLASSIFIER_PROMPT,
     INSTRUCTOR_PROMPT,
     DECIDE_AFTER_INSTRUCTOR_PROMPT,

@@ -61,7 +61,7 @@ export default function InitStudy() {
   return (
     <div className={styles.page}>
       <div className={`${styles.board} ${isSubmitting ? styles.blurred : ""}`}>
-        <div className={styles.header}>학습 노트로 복습 세션 생성</div>
+        <div className={styles.header}>학습 세션 생성</div>
         <div className={styles.navRow}>
           <button type="button" className={`${styles.sideCta} ${styles.sideCtaPrimary}`} onClick={() => navigate('/dashboard')}>
             ← 대시보드로
@@ -111,7 +111,7 @@ export default function InitStudy() {
         <div className={styles.overlay}>
           <div className={styles.overlayCard}>
             <div className={styles.spinner} aria-hidden="true" />
-            <div className={styles.overlayTitle}>사이먼 AI가 복습 세션을 생성하고 있습니다.</div>
+            <div className={styles.overlayTitle}>사이먼 AI가 학습 세션을 생성하고 있습니다.</div>
             <div className={styles.overlayDesc}>잠시 기다려주세요.</div>
             <div className={styles.overlayTimer}>{elapsed.toFixed(1)}s</div>
           </div>

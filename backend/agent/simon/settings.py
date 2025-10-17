@@ -11,13 +11,14 @@ load_dotenv()
 # 각 모델에 필요한 환경 변수가 설정되어 있는지 확인하고,
 # 모델 초기화 과정에서 발생할 수 있는 오류를 처리합니다.
 
-def _initialize_openai_llm(model_name: str, temperature: float):
+def _initialize_openai_llm(model_name: str, reasoning_effort: str):
     """OpenAI 모델을 초기화합니다."""
     if "OPENAI_API_KEY" not in os.environ:
         print(f"경고: 'OPENAI_API_KEY' 환경 변수가 설정되지 않아 {model_name} 모델을 초기화할 수 없습니다.")
         return None
     try:
-        return ChatOpenAI(model=model_name, temperature=temperature)
+        # kwargs를 통해 추가적인 API 파라미터를 전달할 수 있도록 합니다.
+        return ChatOpenAI(model=model_name, reasoning_effort=reasoning_effort)
     except Exception as e:
         print(f"오류: {model_name} 모델 초기화 중 오류 발생: {e}")
         return None
@@ -52,10 +53,18 @@ gemini_flash_lite = _initialize_google_llm(
     }
 )
 
-# OpenAI 모델 (결정자 모델은 낮은 temperature를 사용합니다)
-gpt_5_mini = _initialize_openai_llm("gpt-5-mini-2025-08-07", 1)
-gpt_5_nano = _initialize_openai_llm("gpt-5-nano-2025-08-07", 1)
+# OpenAI 모델 (결정자 모델)
+# gpt_5_mini가 즉시 응답하도록 설정합니다.
+gpt_5_mini = _initialize_openai_llm(
+    "gpt-5-mini-2025-08-07",
+    "minimal",
+)
 
+# gpt_5_nano 모델도 필요하다면 동일하게 설정할 수 있습니다.
+gpt_5_nano = _initialize_openai_llm(
+    "gpt-5-nano-2025-08-07",
+    "minimal",
+)
 # --- 기타 설정 ---
 
 # ChromaDB를 저장한 디렉토리 경로 (이전 코드에서 정의된 경로 사용)

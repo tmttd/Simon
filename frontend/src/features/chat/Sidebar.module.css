@@ -32,6 +32,80 @@
   box-shadow: 0 6px 14px rgba(122,52,176,0.35);
 }
 
+/* Checklist Card */
+.checklistCard {
+  margin: 10px 10px 6px 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: radial-gradient(120% 120% at 0% 0%, rgba(174,76,240,0.12), rgba(14,22,38,0.75));
+  border: 1px solid rgba(174,76,240,0.25);
+}
+
+.checklistHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.subjectTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.pathsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pathRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pathCheck {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(174,76,240,0.6);
+  background: rgba(174,76,240,0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #c084fc;
+}
+
+.pathCheckDone {
+  background: linear-gradient(90deg, var(--brand), #7a34b0);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(122,52,176,0.35);
+}
+
+.pathText {
+  font-size: 12px;
+  color: #d1d5db;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.currentBadge {
+  margin-left: auto;
+  font-size: 10px;
+  color: #fdf2f8;
+  background: linear-gradient(90deg, #ec4899, #8b5cf6);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
 .threadList {
   list-style: none;
   margin: 0;

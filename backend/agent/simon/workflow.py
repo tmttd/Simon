@@ -1,10 +1,12 @@
 import os
+from urllib.parse import quote_plus
+from contextlib import ExitStack
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres import PostgresSaver
 
 # --- 로컬 모듈 임포트 ---
 # 상태 정의, 노드 함수, 라우터 함수를 가져옵니다.
-from simon.nodes.nodes import (
+from .nodes.nodes import (
     AgentState,
     initial_classifier,
     instructor,
@@ -13,6 +15,7 @@ from simon.nodes.nodes import (
     decide_after_tester,
     route_tasks
 )
+
 
 def create_workflow() -> StateGraph:
     """
@@ -68,21 +71,48 @@ def create_workflow() -> StateGraph:
 
 # --- 워크플로우 컴파일 ---
 # 1. PostgreSQL 데이터베이스 연결 정보 설정
-# Django의 settings.py나 OS 환경 변수에서 연결 문자열을 가져옵니다.
+# 우선 POSTGRES_CONNECTION_STRING 환경 변수를 사용하고,
+# 없으면 기존 Django 환경 변수로부터 조합합니다.
 conn_string = os.environ.get("POSTGRES_CONNECTION_STRING")
-if not conn_string:
-    raise ValueError("POSTGRES_CONNECTION_STRING 환경 변수가 설정되지 않았습니다. 예: 'postgresql+psycopg2://user:pass@host:port/dbname'")
 
-# 2. PostgresSaver 인스턴스 생성 (암호화 serde 인자 없이)
-checkpointer = PostgresSaver.from_conn_string(conn_string)
+# psycopg3가 이해할 수 있도록 SQLAlchemy 스타일을 정규화
+def _normalize_psycopg_dsn(dsn: str) -> str:
+    if not dsn:
+        return dsn
+    # postgres:// → postgresql:// 로도 허용됨(둘 다 psycopg가 수용)
+    # SQLAlchemy 스타일 접두사 제거
+    for prefix in (
+        "postgresql+psycopg2://",
+        "postgresql+psycopg://",
+        "postgres+psycopg2://",
+        "postgres+psycopg://",
+    ):
+        if dsn.startswith(prefix):
+            return "postgresql://" + dsn[len(prefix):]
+    return dsn
 
-# 3. 데이터베이스 테이블 확인 및 생성
-# LangGraph가 상태를 저장하는 데 필요한 테이블을 확인하고, 없으면 생성합니다.
-# 애플리케이션이 시작될 때 한 번만 호출하면 됩니다.
+if conn_string:
+    conn_string = _normalize_psycopg_dsn(conn_string)
+else:
+    db = os.environ.get("POSTGRES_DB")
+    user = os.environ.get("POSTGRES_USER")
+    password = os.environ.get("POSTGRES_PASSWORD", "")
+    host = os.environ.get("POSTGRES_HOST", "db")
+    port = os.environ.get("POSTGRES_PORT", "5432")
+    if not all([db, user, host, port]):
+        raise ValueError("POSTGRES_CONNECTION_STRING 환경 변수가 없고, POSTGRES_DB/USER/HOST/PORT 중 일부가 누락되었습니다.")
+    safe_pwd = quote_plus(password)
+    conn_string = f"postgresql://{user}:{safe_pwd}@{host}:{port}/{db}"
+
+# 2. PostgresSaver 인스턴스 생성
+# from_conn_string는 컨텍스트 매니저를 반환하므로, ExitStack으로 전역에서 열어둡니다.
+_exit_stack = ExitStack()
+checkpointer = _exit_stack.enter_context(PostgresSaver.from_conn_string(conn_string))
+
+# 스키마 테이블 생성(최초 1회 안전 호출)
 checkpointer.setup()
-print("✅ workflow.py: 데이터베이스 체크포인터 테이블 설정을 확인/완료했습니다.")
 
-# 4. 워크플로우 그래프 생성 및 컴파일
+# 3. 워크플로우 그래프 생성 및 컴파일
 # checkpointer를 연결하여 대화 상태가 DB에 저장되도록 합니다.
 simon_graph = create_workflow()
 simon_agent = simon_graph.compile(checkpointer=checkpointer)

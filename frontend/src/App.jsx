@@ -18,8 +18,8 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/init-study" element={<InitStudy />} />
             <Route path="/dashboard" element={<GroupsDashboard />} />
-            <Route path="/group/:groupId/chat" element={<ChatPage />} />
-            <Route path="/group/:groupId/chat/:threadId" element={<ChatPage />} />
+            <Route path="/session/:groupId/chat" element={<ChatPage />} />
+            <Route path="/session/:groupId/chat/:threadId" element={<ChatPage />} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />

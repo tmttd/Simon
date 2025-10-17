@@ -3,20 +3,21 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 import styles from "./ChatPage.module.css";
-import { getGroupDetail, listThreads } from "../../api/apiClient";
+import { getSessionDetail, listThreads } from "../../api/apiClient";
 
 export default function ChatPage() {
-  const { threadId, groupId } = useParams();
+  const { threadId, groupId: sessionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [threads, setThreads] = useState([]);
   const [currentThreadId, setCurrentThreadId] = useState(threadId || null);
   const [initialExpandGroupId, setInitialExpandGroupId] = useState(null);
+  const [stateSummary, setStateSummary] = useState(null);
 
   const fetchThreads = useCallback(async () => {
     try {
-      if (groupId) {
-        const detail = await getGroupDetail(groupId);
+      if (sessionId) {
+        const detail = await getSessionDetail(sessionId);
         setThreads(detail.threads || []);
       } else {
         const ungrouped = await listThreads({ ungrouped: true });
@@ -25,7 +26,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error("대화 목록 조회 실패:", err);
     }
-  }, [groupId]);
+  }, [sessionId]);
 
   // URL 파라미터가 변경될 때 currentThreadId 동기화
   useEffect(() => {
@@ -46,22 +47,22 @@ export default function ChatPage() {
   }, [fetchThreads]);
 
   const handleSelectThread = (tid) => {
-    if (groupId) navigate(`/group/${groupId}/chat/${tid}`);
+    if (sessionId) navigate(`/session/${sessionId}/chat/${tid}`);
     else navigate(`/chat/${tid}`);
   };
 
   const handleNewChat = () => {
-    if (groupId) navigate(`/group/${groupId}/chat`);
+    if (sessionId) navigate(`/session/${sessionId}/chat`);
     else navigate('/chat');
   };
 
   const onNewThreadStart = useCallback(
     (newThreadId) => {
       fetchThreads(); // 새 스레드가 생성되면 목록을 다시 불러옵니다.
-      if (groupId) navigate(`/group/${groupId}/chat/${newThreadId}`);
+      if (sessionId) navigate(`/session/${sessionId}/chat/${newThreadId}`);
       else navigate(`/chat/${newThreadId}`);
     },
-    [fetchThreads, navigate, groupId]
+    [fetchThreads, navigate, sessionId]
   );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -88,6 +89,7 @@ export default function ChatPage() {
           onSelectThread={handleSelectThreadWrapped}
           onNewChat={() => { handleNewChat(); closeSidebar(); }}
           onRefresh={fetchThreads}
+          stateSummary={stateSummary}
         />
       </div>
 
@@ -95,9 +97,10 @@ export default function ChatPage() {
 
       <ChatWindow
         threadId={currentThreadId}
-        groupId={groupId}
+        groupId={sessionId}
         onNewThreadStart={onNewThreadStart}
         onOpenMenu={openSidebar}
+        onStateUpdate={setStateSummary}
       />
     </div>
   );

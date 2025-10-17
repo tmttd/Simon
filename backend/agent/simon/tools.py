@@ -5,7 +5,7 @@
 # from langchain_core.tools import tool # tool 데코레이터를 import 합니다.
 
 # # settings.py에서 ChromaDB 경로를 임포트합니다.
-# from simon.settings import CHROMA_DB_PATH_UPSTAGE
+# from .settings import CHROMA_DB_PATH_UPSTAGE
 
 # # --- ChromaDB 및 검색 임베딩 모델 초기화 ---
 # # LangGraph 에이전트 외부에서 한 번만 초기화하도록 전역 변수로 설정합니다.

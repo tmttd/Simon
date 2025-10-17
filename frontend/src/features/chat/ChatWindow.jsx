@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { v4 as uuidv4 } from "uuid";
-import { api as apiClient } from "../../api/apiClient";
+import { api as apiClient, getChatState } from "../../api/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import styles from "./ChatWindow.module.css";
 import { PaperAirplaneIcon, StopIcon, RetryIcon } from "./icons.jsx";
 
-export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpenMenu }) {
+export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpenMenu, onStateUpdate }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -23,6 +23,11 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   const skipHistoryForThreadRef = useRef(null); // 방금 생성한 스레드의 초기 히스토리 fetch를 1회 건너뛰기 위한 플래그
   const currentThreadIdRef = useRef(threadId);
   const threadStatusRef = useRef({});
+
+  // 새로 추가된 상태는 상위로 올림: ChatPage가 Sidebar에 전달
+  const reportState = (summary) => {
+    try { if (onStateUpdate) onStateUpdate(summary); } catch (_) {}
+  };
 
   const isNewChat = !threadId;
   const isBusy = isSending || isFetchingHistory;
@@ -60,6 +65,21 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     setIsSending(!!status.isSending);
     setIsStreaming(!!status.isStreaming);
     requestStartTimeRef.current = status.requestStartTime ?? null;
+  }, [threadId]);
+
+  // 스레드 변경 시 상태 요약 조회
+  useEffect(() => {
+    const fetchState = async () => {
+      if (!threadId) { reportState(null); return; }
+      try {
+        const summary = await getChatState(threadId);
+        reportState(summary || null);
+      } catch (e) {
+        // 상태 조회 실패는 치명적이지 않으므로 콘솔만
+        console.warn("상태 조회 실패", e);
+      }
+    };
+    fetchState();
   }, [threadId]);
 
   useEffect(() => {
@@ -157,7 +177,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
         {
           message: messageText,
           thread_id: newThreadId,
-          group_id: groupId || null,
+          session_id: groupId || null,
         },
         {
           signal: abortControllerRef.current.signal,
@@ -182,6 +202,14 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
 
         // 타이핑 애니메이션 시작
         await typeMessage(response.data.response, duration, newThreadId);
+
+        // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화)
+        try {
+          const summary = await getChatState(newThreadId);
+          reportState(summary || null);
+        } catch (e) {
+          console.warn("상태 동기화 실패", e);
+        }
 
         // 스트리밍 완료 후 백그라운드 동기화로 깜빡임 없이 서버 기록 반영
         await fetchAndMergeHistory(newThreadId);
@@ -231,7 +259,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   // 타이핑 애니메이션 함수
   const typeMessage = async (fullText, duration, targetThreadId) => {
     const chars = fullText.split('');
-    const TYPING_SPEED = 8; // 초당 글자 수 (원하는 속도로 조절 가능)
+    const TYPING_SPEED = 20; // 초당 글자 수 (원하는 속도로 조절 가능)
     const delay = 1000 / TYPING_SPEED; // 각 글자 간격 (ms)
     
     for (let i = 0; i <= chars.length; i++) {

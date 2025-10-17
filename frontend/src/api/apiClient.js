@@ -142,37 +142,42 @@ export async function classifyStudy({ noteText, files }) {
   const res = await api.post("chat/classify/", form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return res.data; // { group, threads, count }
+  return res.data; // { session, thread }
 }
 
-// 그룹/스레드 목록 API
-export async function listStudyGroups() {
-  const res = await api.get("chat/groups/");
+// 세션/스레드 목록 API
+export async function listStudySessions() {
+  const res = await api.get("chat/sessions/");
   return res.data; // [{ id, title }]
 }
 
 export async function listThreads({ ungrouped = false } = {}) {
   const query = ungrouped ? "?ungrouped=1" : "";
   const res = await api.get(`chat/threads/${query}`);
-  return res.data; // [{ id, title, group_id }]
+  return res.data; // [{ id, title, session_id }]
 }
 
-export async function getGroupDetail(groupId) {
-  const res = await api.get(`chat/group/${groupId}/`);
-  return res.data; // { group: {id,title}, threads: [...], count }
+export async function getSessionDetail(sessionId) {
+  const res = await api.get(`chat/session/${sessionId}/`);
+  return res.data; // { session: {id,title}, threads: [...], count }
 }
 
-export async function createGroup(title) {
-  const res = await api.post("chat/groups/create/", { title });
+export async function createSession(title) {
+  const res = await api.post("chat/sessions/create/", { title });
   return res.data; // { id, title }
 }
 
-export async function assignThreadToGroup(threadId, groupId) {
-  const res = await api.patch(`chat/thread/${threadId}/`, { group_id: groupId });
+export async function assignThreadToSession(threadId, sessionId) {
+  const res = await api.patch(`chat/thread/${threadId}/`, { session_id: sessionId });
   return res.data; // updated thread
 }
 
-export async function deleteGroup(groupId) {
-  const res = await api.delete(`chat/group/${groupId}/`);
+export async function deleteSession(sessionId) {
+  const res = await api.delete(`chat/session/${sessionId}/`);
   return res.data;
+}
+
+export async function getChatState(threadId) {
+  const res = await api.get(`chat/state/${threadId}/`);
+  return res.data; // { subject, learning_paths, current_path_index, current_task, session_finished }
 }
