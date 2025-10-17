@@ -186,21 +186,17 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
       if (response.data && response.data.response) {
         const storedRequestStart = threadStatusRef.current[getStatusKey(newThreadId)]?.requestStartTime;
         const duration = storedRequestStart ? (Date.now() - storedRequestStart) / 1000 : 0;
-        
-        // API 응답을 받은 후 스트리밍 상태로 변경
-        updateThreadStatus(newThreadId, { isStreaming: true });
-        
-        // AI 메시지를 미리 추가 (타이핑 애니메이션용)
+
+        // 전체 응답을 수신한 뒤 페이드인으로 한 번에 표시
         const aiMessage = {
           sender: "ai",
-          text: "",
-          duration: 0,
+          text: response.data.response,
+          duration,
           threadId: newThreadId,
+          isTyping: false,
+          fadeIn: true,
         };
         setMessages((prev) => [...prev, aiMessage]);
-
-        // 타이핑 애니메이션 시작
-        await typeMessage(response.data.response, duration, newThreadId);
 
         // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화)
         try {
@@ -255,52 +251,8 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
     }
   };
 
-  // 타이핑 애니메이션 함수
-  const typeMessage = async (fullText, duration, targetThreadId) => {
-    const chars = fullText.split('');
-    const TYPING_SPEED = 20; // 초당 글자 수 (원하는 속도로 조절 가능)
-    const delay = 1000 / TYPING_SPEED; // 각 글자 간격 (ms)
-    
-    for (let i = 0; i <= chars.length; i++) {
-      if (abortControllerRef.current?.signal.aborted) {
-        break; // 중단된 경우 타이핑 중지
-      }
-      if (currentThreadIdRef.current !== targetThreadId) {
-        break;
-      }
-      
-      const currentText = chars.slice(0, i).join('');
-      // 타이핑 중일 때는 커서를 텍스트에 직접 포함
-      const displayText = i < chars.length ? currentText + '▋' : currentText;
-      
-      setMessages((prev) => {
-        const newMessages = [...prev];
-        let lastMessageIndex = -1;
-        for (let idx = newMessages.length - 1; idx >= 0; idx--) {
-          const msg = newMessages[idx];
-          if (msg.sender === "ai" && msg.threadId === targetThreadId) {
-            lastMessageIndex = idx;
-            break;
-          }
-        }
-        if (lastMessageIndex === -1) {
-          return prev;
-        }
-        const lastMessage = newMessages[lastMessageIndex];
-        lastMessage.text = displayText;
-        lastMessage.isTyping = i < chars.length;
-        if (i === chars.length) {
-          lastMessage.duration = duration;
-          lastMessage.isTyping = false;
-        }
-        return newMessages;
-      });
-      
-      if (i < chars.length) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  };
+  // 타이핑 애니메이션 함수 (비활성화)
+  // const typeMessage = async (fullText, duration, targetThreadId) => { /* disabled */ };
 
   // 스트리밍 종료 후 서버 히스토리를 백그라운드로 가져와 현재 메시지와 깜빡임 없이 병합
   const fetchAndMergeHistory = async (tid) => {
@@ -447,9 +399,14 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
         disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending)}
       >
         {isSending ? (
-          <StopIcon className={styles.icon} />
+          <>
+            <StopIcon className={styles.icon} />
+            <span>중지</span>
+          </>
         ) : (
-          <PaperAirplaneIcon className={styles.icon} />
+          <>
+            <span>Ctrl + ↵</span>
+          </>
         )}
       </button>
     </form>
@@ -487,7 +444,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
           {messages.map((msg, index) => (
             <div
               key={index}
-              className={`${styles.message} ${
+              className={`${styles.message} ${msg.fadeIn ? styles.fadeIn : ''} ${
                 msg.sender === "user" ? styles.userMessage : styles.aiMessage
               }`}
             >

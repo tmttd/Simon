@@ -24,12 +24,19 @@ def get_ai_response(user_message: str, thread_id: str, is_first_turn: bool = Fal
     else:
         inputs = {"messages": [HumanMessage(content=user_message)]}
 
-    final_response = ""
-    for chunk in simon_agent.stream(inputs, config=config):
-        for state_update in chunk.values():
-            if "messages" in state_update:
-                last_message = state_update['messages'][-1]
-                if isinstance(last_message, AIMessage) and last_message.content:
-                    final_response += last_message.content
-    
-    return final_response if final_response else "죄송합니다. 오류가 발생하여 응답을 생성하지 못했습니다."
+    # invoke로 한 번에 실행하여 최종 메시지를 추출
+    try:
+        state = simon_agent.invoke(inputs, config=config)
+        msgs = state.get('messages') or []
+        if msgs:
+            last = msgs[-1]
+            if isinstance(last, AIMessage) and getattr(last, 'content', None):
+                return last.content
+            # 일부 런타임에서 dict로 반환될 수 있음
+            if isinstance(last, dict):
+                content = last.get('content')
+                if content:
+                    return content
+        return ""
+    except Exception:
+        return ""

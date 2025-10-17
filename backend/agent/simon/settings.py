@@ -57,13 +57,13 @@ gemini_flash_lite = _initialize_google_llm(
 # gpt_5_mini가 즉시 응답하도록 설정합니다.
 gpt_5_mini = _initialize_openai_llm(
     "gpt-5-mini-2025-08-07",
-    "minimal",
+    "low", # minimal, low, medium, high 중 택1
 )
 
 # gpt_5_nano 모델도 필요하다면 동일하게 설정할 수 있습니다.
 gpt_5_nano = _initialize_openai_llm(
     "gpt-5-nano-2025-08-07",
-    "minimal",
+    "low", # minimal, low, medium, high 중 택1
 )
 # --- 기타 설정 ---
 
