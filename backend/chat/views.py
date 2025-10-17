@@ -264,7 +264,7 @@ class StudySessionListView(APIView):
                 StudySession.objects
                 .filter(user=request.user, is_deleted=False)
                 .annotate(count=Count('threads', filter=Q(threads__is_deleted=False)))
-                .values('id', 'title', 'count', 'updated_at')
+                .values('id', 'title', 'count', 'created_at', 'updated_at')
                 .order_by('-updated_at')
             )
             return Response(list(sessions), status=status.HTTP_200_OK)

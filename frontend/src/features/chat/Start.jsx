@@ -40,7 +40,7 @@ export default function Start() {
     setError(null);
     try {
       const data = await classifyStudy({ noteText, files });
-      navigate('/dashboard', { state: { highlightGroupId: data?.group?.id || null } });
+      navigate('/dashboard', { state: { highlightGroupId: data?.session?.id || null } });
     } catch (e) {
       setError(e?.response?.data?.error || "요청 처리 중 오류가 발생했습니다.");
     } finally {

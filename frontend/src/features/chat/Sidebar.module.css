@@ -89,6 +89,22 @@
   box-shadow: 0 4px 10px rgba(122,52,176,0.35);
 }
 
+/* 완료 축하 애니메이션 */
+.celebrate {
+  animation: goldenPulse 0.6s ease-in-out 3;
+}
+
+@keyframes goldenPulse {
+  0%, 100% {
+    box-shadow: 0 4px 10px rgba(122,52,176,0.35);
+    border-color: transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.8), 0 0 20px rgba(251, 191, 36, 0.6), 0 4px 10px rgba(122,52,176,0.35);
+    border-color: #fbbf24;
+  }
+}
+
 .pathText {
   font-size: 12px;
   color: #d1d5db;

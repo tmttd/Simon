@@ -19,6 +19,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   const [pendingUserText, setPendingUserText] = useState(null);
   const [fadeOutOldPair, setFadeOutOldPair] = useState(false);
   const [visiblePair, setVisiblePair] = useState({ userText: null, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: false });
+  const [sessionFinished, setSessionFinished] = useState(false); // 세션 완료 상태
   const fadeOutTimeoutRef = useRef(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -93,10 +94,16 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
   // 스레드 변경 시 상태 요약 조회
   useEffect(() => {
     const fetchState = async () => {
-      if (!threadId) { reportState(null); return; }
+      if (!threadId) { 
+        reportState(null); 
+        setSessionFinished(false); // 새 채팅이면 초기화
+        return; 
+      }
       try {
         const summary = await getChatState(threadId);
         reportState(summary || null);
+        // session_finished 상태 업데이트
+        setSessionFinished(!!summary?.session_finished);
       } catch (e) {
         // 상태 조회 실패는 치명적이지 않으므로 콘솔만
         console.warn("상태 조회 실패", e);
@@ -238,10 +245,11 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
         setFadeOutOldPair(false);
         setVisiblePair({ userText: currentUserText, aiText: response.data.response, aiDuration: duration, fadeIn: true, aiIsIndicator: false });
 
-        // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화)
+        // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화 + 세션 완료 확인)
         try {
           const summary = await getChatState(newThreadId);
           reportState(summary || null);
+          setSessionFinished(!!summary?.session_finished);
         } catch (e) {
           console.warn("상태 동기화 실패", e);
         }
@@ -372,7 +380,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim() || isBusy || sessionFinished) return;
 
     setPendingUserText(input);
     setFadeOutOldPair(true);
@@ -396,7 +404,7 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+Enter 또는 Cmd+Enter: 전송
         e.preventDefault();
-        if (!input.trim() || isBusy) return;
+        if (!input.trim() || isBusy || sessionFinished) return;
         
         setPendingUserText(input);
         setFadeOutOldPair(true);
@@ -448,16 +456,16 @@ export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpen
         value={input}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        placeholder="메세지를 입력하세요. (Ctrl+Enter: 전송)"
+        placeholder={sessionFinished ? "세션이 완료되었습니다." : "메세지를 입력하세요. (Ctrl+Enter: 전송)"}
         className={styles.input}
-        disabled={isBusy}
+        disabled={isBusy || sessionFinished}
         rows={1}
       />
       <button
         type={isSending ? "button" : "submit"}
         className={styles.submitBtn}
         onClick={isSending ? handleStop : undefined}
-        disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending)}
+        disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending) || sessionFinished}
       >
         {isSending ? (
           <>
