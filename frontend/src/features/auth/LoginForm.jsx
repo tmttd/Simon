@@ -17,7 +17,7 @@ export default function LoginForm() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const fromPath = location.state?.from?.pathname || "/chat";
+  const fromPath = location.state?.from?.pathname || "/dashboard";
 
   const [errorMsg, setErrorMsg] = useState("");
 
