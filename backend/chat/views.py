@@ -49,7 +49,8 @@ class ChatAgentView(APIView):
                     id=thread_id,
                     defaults={'user': request.user, 'title': user_message[:20], 'session': session}
                 )
-                if not created and thread.user != request.user:
+                # user_id로 비교 (DB 쿼리 발생하지 않음)
+                if not created and thread.user_id != request.user.id:
                     return Response({'error': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
                 # 기존 스레드에 세션이 없고 유효한 세션이 전달되면 지정
                 if session and thread.session_id is None:
@@ -331,7 +332,7 @@ class ThreadDetailView(APIView):
                 thread.session = session
 
         await sync_to_async(thread.save)()
-        return Response({'id': thread.id, 'title': thread.title, 'session_id': str(thread.session.id) if thread.session else None}, status=status.HTTP_200_OK)
+        return Response({'id': thread.id, 'title': thread.title, 'session_id': str(thread.session_id) if thread.session_id else None}, status=status.HTTP_200_OK)
 
     async def delete(self, request, thread_id, *args, **kwargs) -> Response:
         """대화를 삭제 처리(soft delete)합니다."""
