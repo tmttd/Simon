@@ -18,7 +18,7 @@ EMAIL = "test@test.com"
 PASSWORD = "KXNipo285@"
 
 # 부하 테스트 설정
-NUM_CONCURRENT_REQUESTS = 30  # 동시 요청 수
+NUM_CONCURRENT_REQUESTS = 50  # 동시 요청 수
 TEST_MESSAGE = "안녕하세요, 이것은 부하 테스트 메시지입니다. 아무런 학습 세션이나 자유롭게 생성해주세요."
 
 
