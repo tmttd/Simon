@@ -101,6 +101,9 @@ TEMPLATES = [
     },
 ]
 
+# 비동기 서버(ASGI) 설정
+ASGI_APPLICATION = 'config.asgi.application'
+# 기존 WSGI (호환성 유지)
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
@@ -115,6 +118,12 @@ DATABASES = {
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
         'HOST': os.environ.get('POSTGRES_HOST'),
         'PORT': os.environ.get('POSTGRES_PORT'),
+        # 비동기 최적화: DB 연결 풀 설정
+        'CONN_MAX_AGE': 600,  # 연결을 10분간 재사용
+        'CONN_HEALTH_CHECKS': True,  # 연결 상태 자동 체크
+        'OPTIONS': {
+            'connect_timeout': 10,  # 연결 타임아웃 10초
+        }
     }
 }
 
