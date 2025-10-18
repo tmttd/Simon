@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -57,17 +58,18 @@ gemini_flash_lite = _initialize_google_llm(
 # gpt_5_mini가 즉시 응답하도록 설정합니다.
 gpt_5_mini = _initialize_openai_llm(
     "gpt-5-mini-2025-08-07",
-    "low", # minimal, low, medium, high 중 택1
+    "medium", # minimal, low, medium, high 중 택1
 )
 
 # gpt_5_nano 모델도 필요하다면 동일하게 설정할 수 있습니다.
 gpt_5_nano = _initialize_openai_llm(
     "gpt-5-nano-2025-08-07",
-    "low", # minimal, low, medium, high 중 택1
+    "medium", # minimal, low, medium, high 중 택1
 )
 # --- 기타 설정 ---
 
-# ChromaDB를 저장한 디렉토리 경로 (이전 코드에서 정의된 경로 사용)
-CHROMA_DB_PATH_UPSTAGE = "./korean_grammar_chroma_db"
+# settings.py의 위치를 기준으로 절대 경로 생성
+BASE_DIR = Path(__file__).resolve().parent  # backend/agent/simon 디렉토리
+CHROMA_DB_PATH_UPSTAGE = os.path.join(BASE_DIR, "chroma_db")
 
 print("✅ settings.py: LLM 모델 및 기타 환경 설정 로드 완료.")
