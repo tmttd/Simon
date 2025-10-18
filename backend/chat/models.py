@@ -2,12 +2,38 @@ from django.db import models
 from django.conf import settings
 import uuid
 
+
+class StudySession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='study_sessions'
+    )
+    title = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.title} ({self.user.username})"
+
+    class Meta:
+        ordering = ['-created_at']
+
 class Thread(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='chat_threads'
+    )
+    session = models.ForeignKey(
+        'StudySession',
+        on_delete=models.CASCADE,
+        related_name='threads',
+        null=True,
+        blank=True
     )
     title = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)

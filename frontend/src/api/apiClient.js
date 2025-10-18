@@ -129,3 +129,55 @@ export async function logout() {
     clearAccessToken();
   }
 }
+
+// 분류 생성: 텍스트 + 다중 이미지 업로드
+export async function classifyStudy({ noteText, files }) {
+  const form = new FormData();
+  if (noteText) form.append("note_text", noteText);
+  if (Array.isArray(files)) {
+    for (const f of files) {
+      form.append("files", f);
+    }
+  }
+  const res = await api.post("chat/classify/", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data; // { session, thread }
+}
+
+// 세션/스레드 목록 API
+export async function listStudySessions() {
+  const res = await api.get("chat/sessions/");
+  return res.data; // [{ id, title }]
+}
+
+export async function listThreads({ ungrouped = false } = {}) {
+  const query = ungrouped ? "?ungrouped=1" : "";
+  const res = await api.get(`chat/threads/${query}`);
+  return res.data; // [{ id, title, session_id }]
+}
+
+export async function getSessionDetail(sessionId) {
+  const res = await api.get(`chat/session/${sessionId}/`);
+  return res.data; // { session: {id,title}, threads: [...], count }
+}
+
+export async function createSession(title) {
+  const res = await api.post("chat/sessions/create/", { title });
+  return res.data; // { id, title }
+}
+
+export async function assignThreadToSession(threadId, sessionId) {
+  const res = await api.patch(`chat/thread/${threadId}/`, { session_id: sessionId });
+  return res.data; // updated thread
+}
+
+export async function deleteSession(sessionId) {
+  const res = await api.delete(`chat/session/${sessionId}/`);
+  return res.data;
+}
+
+export async function getChatState(threadId) {
+  const res = await api.get(`chat/state/${threadId}/`);
+  return res.data; // { subject, learning_paths, current_path_index, current_task, session_finished }
+}

@@ -3,7 +3,7 @@
 .window {
   width: 100%;
   height: 100vh;
-  background: #111827;
+  background: linear-gradient(180deg, #0e1626 0%, #0b1220 100%);
   color: #f9fafb;
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -18,7 +18,7 @@
 
 .header {
   padding: 16px 20px;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid #1f2937;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -80,11 +80,11 @@
 .main {
   padding: 16px 20px;
   overflow-y: auto;
-  background: #111827;
+  background: transparent;
   color: #f9fafb;
-  position: relative; /* welcome 메시지 위치 기준 */
-  display: flex; /* 추가 */
-  flex-direction: column; /* 추가 */
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .welcome {
@@ -108,6 +108,56 @@
   line-height: 1.6;
 }
 
+.fadeIn {
+  opacity: 0;
+  animation: fadeIn 3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 좌->우로 드러나는 페이드 인 */
+.fadeInLR {
+  opacity: 0;
+  will-change: clip-path, opacity;
+  animation: revealLR 3s ease-in-out forwards;
+}
+
+@keyframes revealLR {
+  from { clip-path: inset(0 100% 0 0); opacity: 0; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+
+/* 이전 쌍을 사라지게 하는 페이드 아웃 */
+.fadeOut {
+  opacity: 1;
+  animation: fadeOut .45s ease forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+/* 전송 중 우측 상단 사용자 메시지 오버레이 */
+.pendingUserBubble {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  z-index: 2;
+  max-width: 60%;
+}
+
+/* 전송 중 좌측 하단 로딩 인디케이터 오버레이 */
+.sendingIndicator {
+  position: absolute;
+  left: 20px;
+  bottom: 12px;
+  z-index: 2;
+}
+
 .userMessage {
   background: var(--brand);
   color: #fff;
@@ -117,7 +167,7 @@
 }
 
 .aiMessage {
-  background: #374151;
+  background: radial-gradient(120% 120% at 0% 0%, rgba(174,76,240,0.12), rgba(14,22,38,0.85));
   color: #f9fafb;
   align-self: flex-start;
   margin-right: auto;
@@ -141,7 +191,7 @@
   display: flex;
   gap: 8px;
   padding: 12px 12px 16px;
-  border-top: 1px solid #374151;
+  border-top: 1px solid #1f2937;
   position: relative; /* 애니메이션을 위해 추가 */
   z-index: 1; /* main 콘텐츠 위에 오도록 */
 }
@@ -150,10 +200,10 @@
   flex: 1;
   padding: 12px 14px;
   border-radius: var(--radius);
-  border: 1px solid #4b5563; /* 다크 모드용 테두리 */
+  border: 1px solid #25324a; /* 다크 모드용 테두리 */
   outline: none;
   font-size: 15px;
-  background: #374151; /* 다크 모드용 입력창 배경 */
+  background: #0e1626; /* 다크 모드용 입력창 배경 */
   color: #f9fafb;      /* 다크 모드용 입력창 글자색 */
   resize: none; /* 수동 크기 조절 비활성화 */
   min-height: 44px; /* 최소 높이 설정 */
@@ -173,15 +223,18 @@
 }
 
 .submitBtn {
-  padding: 12px 16px;
+  padding: 12px 18px;
   border: none;
   border-radius: var(--radius);
   font-weight: 700;
-  background: var(--brand); /* 브랜드 색상으로 되돌립니다. */
+  background: linear-gradient(90deg, var(--brand), #7a34b0);
   color: #fff;
   cursor: pointer;
   transition: filter .15s ease, opacity .15s ease; /* LoginForm과 통일 */
   font-size: 15px; /* 이전 오타 수정 */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .submitBtn:hover {

@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { v4 as uuidv4 } from "uuid";
-import { api as apiClient } from "../../api/apiClient";
+import { api as apiClient, getChatState } from "../../api/apiClient";
 import { useAuth } from "../../context/AuthContext";
 import styles from "./ChatWindow.module.css";
 import { PaperAirplaneIcon, StopIcon, RetryIcon } from "./icons.jsx";
 
-export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
+export default function ChatWindow({ threadId, groupId, onNewThreadStart, onOpenMenu, onStateUpdate }) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -16,6 +16,11 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [, setNow] = useState(null); // For re-rendering during loading
   const [error, setError] = useState(null);
+  const [pendingUserText, setPendingUserText] = useState(null);
+  const [fadeOutOldPair, setFadeOutOldPair] = useState(false);
+  const [visiblePair, setVisiblePair] = useState({ userText: null, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: false });
+  const [sessionFinished, setSessionFinished] = useState(false); // 세션 완료 상태
+  const fadeOutTimeoutRef = useRef(null);
   const mainRef = useRef(null);
   const abortControllerRef = useRef(null);
   const requestStartTimeRef = useRef(null);
@@ -24,13 +29,37 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
   const currentThreadIdRef = useRef(threadId);
   const threadStatusRef = useRef({});
 
+  // 새로 추가된 상태는 상위로 올림: ChatPage가 Sidebar에 전달
+  const reportState = (summary) => {
+    try { if (onStateUpdate) onStateUpdate(summary); } catch (_) {}
+  };
+
   const isNewChat = !threadId;
   const isBusy = isSending || isFetchingHistory;
 
-  // 초기 렌더링 상태인지 판단 (애니메이션 클래스 적용 기준)
-  const isInitialView = isNewChat && messages.length === 0;
+  
 
   const getStatusKey = (tid) => (tid == null ? "__new__" : tid);
+
+  const getLatestPairFrom = (arr) => {
+    if (!Array.isArray(arr) || arr.length === 0) return { userText: null, aiText: null, aiDuration: 0 };
+    let aiIndex = -1;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const m = arr[i];
+      if (m.sender === "ai" && (m.text || "").length > 0) { aiIndex = i; break; }
+    }
+    if (aiIndex === -1) return { userText: null, aiText: null, aiDuration: 0 };
+    let userIndex = -1;
+    for (let j = aiIndex - 1; j >= 0; j--) {
+      const m = arr[j];
+      if (m.sender === "user") { userIndex = j; break; }
+    }
+    return {
+      userText: userIndex !== -1 ? (arr[userIndex].text || null) : null,
+      aiText: arr[aiIndex].text || null,
+      aiDuration: Number(arr[aiIndex].duration || 0),
+    };
+  };
 
   const updateThreadStatus = (tid, updates) => {
     const key = getStatusKey(tid);
@@ -62,6 +91,27 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     requestStartTimeRef.current = status.requestStartTime ?? null;
   }, [threadId]);
 
+  // 스레드 변경 시 상태 요약 조회
+  useEffect(() => {
+    const fetchState = async () => {
+      if (!threadId) { 
+        reportState(null); 
+        setSessionFinished(false); // 새 채팅이면 초기화
+        return; 
+      }
+      try {
+        const summary = await getChatState(threadId);
+        reportState(summary || null);
+        // session_finished 상태 업데이트
+        setSessionFinished(!!summary?.session_finished);
+      } catch (e) {
+        // 상태 조회 실패는 치명적이지 않으므로 콘솔만
+        console.warn("상태 조회 실패", e);
+      }
+    };
+    fetchState();
+  }, [threadId]);
+
   useEffect(() => {
     if (isNewChat) {
       setMessages([]);
@@ -91,6 +141,8 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
               isTyping: false,
             }));
           });
+          const pair = getLatestPairFrom(serverHistory);
+          setVisiblePair({ userText: pair.userText, aiText: pair.aiText, aiDuration: pair.aiDuration, fadeIn: false, aiIsIndicator: false });
 
           // 완료 판정: 마지막 항목이 ai이고 text가 존재하면 완료로 간주
           const last = serverHistory[serverHistory.length - 1];
@@ -114,11 +166,12 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     fetchHistory();
   }, [threadId, isNewChat]);
 
-  useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = mainRef.current.scrollHeight;
-    }
-  }, [messages, isBusy, error]);
+  // 자동 스크롤 비활성화 - 사용자가 직접 스크롤 위치 제어
+  // useEffect(() => {
+  //   if (mainRef.current) {
+  //     mainRef.current.scrollTop = mainRef.current.scrollHeight;
+  //   }
+  // }, [messages, isBusy, error]);
 
   useEffect(() => {
     if (!isSending) return;
@@ -157,6 +210,7 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
         {
           message: messageText,
           thread_id: newThreadId,
+          session_id: groupId || null,
         },
         {
           signal: abortControllerRef.current.signal,
@@ -166,21 +220,39 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       if (response.data && response.data.response) {
         const storedRequestStart = threadStatusRef.current[getStatusKey(newThreadId)]?.requestStartTime;
         const duration = storedRequestStart ? (Date.now() - storedRequestStart) / 1000 : 0;
-        
-        // API 응답을 받은 후 스트리밍 상태로 변경
-        updateThreadStatus(newThreadId, { isStreaming: true });
-        
-        // AI 메시지를 미리 추가 (타이핑 애니메이션용)
+
+        // 전체 응답을 수신한 뒤 페이드인으로 한 번에 표시
         const aiMessage = {
           sender: "ai",
-          text: "",
-          duration: 0,
+          text: response.data.response,
+          duration,
           threadId: newThreadId,
+          isTyping: false,
+          fadeIn: true,
         };
-        setMessages((prev) => [...prev, aiMessage]);
+        // 타이머가 아직 유효하면 취소 (페이드아웃 완료 후 인디케이터 세팅되는 타이밍이 응답과 경합하지 않게)
+        if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); fadeOutTimeoutRef.current = null; }
 
-        // 타이핑 애니메이션 시작
-        await typeMessage(response.data.response, duration, newThreadId);
+        // messageText 파라미터를 사용 (상태값이 아닌 함수 호출 시점의 값 사용)
+        const currentUserText = messageText;
+        setMessages((prev) => {
+          const next = [...prev];
+          if (currentUserText) next.push({ sender: 'user', text: currentUserText });
+          next.push(aiMessage);
+          return next;
+        });
+        // visiblePair: 인디케이터에서 실제 응답으로 교체 + 페이드인
+        setFadeOutOldPair(false);
+        setVisiblePair({ userText: currentUserText, aiText: response.data.response, aiDuration: duration, fadeIn: true, aiIsIndicator: false });
+
+        // 스트리밍 종료 후 상태 동기화 (체크리스트 최신화 + 세션 완료 확인)
+        try {
+          const summary = await getChatState(newThreadId);
+          reportState(summary || null);
+          setSessionFinished(!!summary?.session_finished);
+        } catch (e) {
+          console.warn("상태 동기화 실패", e);
+        }
 
         // 스트리밍 완료 후 백그라운드 동기화로 깜빡임 없이 서버 기록 반영
         await fetchAndMergeHistory(newThreadId);
@@ -191,6 +263,9 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
           skipHistoryForThreadRef.current = newThreadId;
           onNewThreadStart(newThreadId);
         }
+
+        // 응답 수신 후 오버레이 초기화
+        setPendingUserText(null);
       }
     } catch (err) {
       if (err.name === "CanceledError") {
@@ -227,52 +302,8 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     }
   };
 
-  // 타이핑 애니메이션 함수
-  const typeMessage = async (fullText, duration, targetThreadId) => {
-    const chars = fullText.split('');
-    const TYPING_SPEED = 8; // 초당 글자 수 (원하는 속도로 조절 가능)
-    const delay = 1000 / TYPING_SPEED; // 각 글자 간격 (ms)
-    
-    for (let i = 0; i <= chars.length; i++) {
-      if (abortControllerRef.current?.signal.aborted) {
-        break; // 중단된 경우 타이핑 중지
-      }
-      if (currentThreadIdRef.current !== targetThreadId) {
-        break;
-      }
-      
-      const currentText = chars.slice(0, i).join('');
-      // 타이핑 중일 때는 커서를 텍스트에 직접 포함
-      const displayText = i < chars.length ? currentText + '▋' : currentText;
-      
-      setMessages((prev) => {
-        const newMessages = [...prev];
-        let lastMessageIndex = -1;
-        for (let idx = newMessages.length - 1; idx >= 0; idx--) {
-          const msg = newMessages[idx];
-          if (msg.sender === "ai" && msg.threadId === targetThreadId) {
-            lastMessageIndex = idx;
-            break;
-          }
-        }
-        if (lastMessageIndex === -1) {
-          return prev;
-        }
-        const lastMessage = newMessages[lastMessageIndex];
-        lastMessage.text = displayText;
-        lastMessage.isTyping = i < chars.length;
-        if (i === chars.length) {
-          lastMessage.duration = duration;
-          lastMessage.isTyping = false;
-        }
-        return newMessages;
-      });
-      
-      if (i < chars.length) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  };
+  // 타이핑 애니메이션 함수 (비활성화)
+  // const typeMessage = async (fullText, duration, targetThreadId) => { /* disabled */ };
 
   // 스트리밍 종료 후 서버 히스토리를 백그라운드로 가져와 현재 메시지와 깜빡임 없이 병합
   const fetchAndMergeHistory = async (tid) => {
@@ -349,10 +380,16 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim() || isBusy || sessionFinished) return;
 
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
+    setPendingUserText(input);
+    setFadeOutOldPair(true);
+    // 페이드아웃 후 새 쌍으로 교체
+    if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+    fadeOutTimeoutRef.current = setTimeout(() => {
+      setFadeOutOldPair(false);
+      setVisiblePair({ userText: input, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: true });
+    }, 450);
     executeSend(input, threadId);
     setInput("");
     // textarea 높이 초기화
@@ -367,10 +404,16 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+Enter 또는 Cmd+Enter: 전송
         e.preventDefault();
-        if (!input.trim() || isBusy) return;
+        if (!input.trim() || isBusy || sessionFinished) return;
         
-        const userMessage = { sender: "user", text: input };
-        setMessages((prev) => [...prev, userMessage]);
+        setPendingUserText(input);
+        setFadeOutOldPair(true);
+        // 페이드아웃 후 새 쌍으로 교체
+        if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+        fadeOutTimeoutRef.current = setTimeout(() => {
+          setFadeOutOldPair(false);
+          setVisiblePair({ userText: input, aiText: null, aiDuration: 0, fadeIn: false, aiIsIndicator: true });
+        }, 450);
         executeSend(input, threadId);
         setInput("");
         // textarea 높이 초기화
@@ -399,6 +442,12 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    setPendingUserText(null);
+    setFadeOutOldPair(false);
+    if (fadeOutTimeoutRef.current) { clearTimeout(fadeOutTimeoutRef.current); }
+    // 이전 메시지 기록 기준으로 visiblePair 복구
+    const pair = getLatestPairFrom(messages);
+    setVisiblePair({ userText: pair.userText, aiText: pair.aiText, aiDuration: pair.aiDuration, fadeIn: false, aiIsIndicator: false });
   };
 
   const chatForm = (
@@ -407,66 +456,32 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
         value={input}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        placeholder="메세지를 입력하세요. (Ctrl+Enter: 전송)"
+        placeholder={sessionFinished ? "세션이 완료되었습니다." : "메세지를 입력하세요. (Ctrl+Enter: 전송)"}
         className={styles.input}
-        disabled={isBusy}
+        disabled={isBusy || sessionFinished}
         rows={1}
       />
       <button
         type={isSending ? "button" : "submit"}
         className={styles.submitBtn}
         onClick={isSending ? handleStop : undefined}
-        disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending)}
+        disabled={(isFetchingHistory && !isSending) || (!input.trim() && !isSending) || sessionFinished}
       >
         {isSending ? (
-          <StopIcon className={styles.icon} />
+          <>
+            <StopIcon className={styles.icon} />
+            <span>중지</span>
+          </>
         ) : (
-          <PaperAirplaneIcon className={styles.icon} />
+          <>
+            <span>Ctrl + ↵</span>
+          </>
         )}
       </button>
     </form>
   );
 
-  if (isInitialView) {
-    return (
-      <div className={`${styles.window} ${styles.initialLayout}`}>
-        <header className={styles.header}>
-          <button className={styles.mobileMenuBtn} onClick={onOpenMenu} aria-label="Open menu" />
-          <div className={styles.brand}>
-            <img
-              src="/simon_logo_32.png"
-              srcSet="/simon_logo_32.png 1x, /simon_logo_64.png 2x, /simon_logo_96.png 3x"
-              alt="Simon logo"
-              className={styles.logo}
-            />
-            <div>
-              <h1 className={styles.title}>Simon says</h1>
-              <p className={styles.subtitle}>
-                {user?.email
-                  ? `${user.username || (user.first_name && user.last_name ? `${user.last_name}${user.first_name}` : user.email)}님, 안녕하세요!`
-                  : "무엇이든 물어보세요!"}
-              </p>
-            </div>
-          </div>
-          <button onClick={logout} className={styles.logoutBtn}>
-            로그아웃
-          </button>
-        </header>
-        <div className={styles.initialMain}>
-          <div className={styles.welcome}>
-            <img
-              src="/simon_logo_48.png"
-              srcSet="/simon_logo_48.png 1x, /simon_logo_96.png 2x, /simon_logo_144.png 3x"
-              alt="Simon logo"
-              className={styles.logoLarge}
-            />
-            <h1 className={styles.title}>무엇이든 물어보세요!</h1>
-          </div>
-          {chatForm}
-        </div>
-      </div>
-    );
-  }
+  
 
   return (
     <div className={styles.window}>
@@ -495,37 +510,42 @@ export default function ChatWindow({ threadId, onNewThreadStart, onOpenMenu }) {
 
       <main ref={mainRef} className={styles.main}>
         <div className={styles.messageList}>
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`${styles.message} ${
-                msg.sender === "user" ? styles.userMessage : styles.aiMessage
-              }`}
-            >
+          {visiblePair.userText && (
+            <div className={`${styles.message} ${styles.userMessage} ${fadeOutOldPair ? styles.fadeOut : ''}`}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {msg.text}
+                {visiblePair.userText}
               </ReactMarkdown>
-              {msg.sender === "ai" && msg.duration > 0 && !msg.isTyping && (
-                <div className={styles.timer}>
-                  {msg.duration.toFixed(1)}s
-                </div>
-              )}
-            </div>
-          ))}
-          {isSending && pendingThreadIdRef.current === threadId && !isStreaming && requestStartTimeRef.current && (
-            <div className={`${styles.message} ${styles.aiMessage}`}>
-              <div className={styles.loadingContainer}>
-                <div className={styles.loadingDots}>
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                </div>
-                <div className={styles.timer}>
-                  {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
-                </div>
-              </div>
             </div>
           )}
+
+          <div className={`${styles.message} ${styles.aiMessage} ${(visiblePair.fadeIn && !fadeOutOldPair) ? styles.fadeIn : ''} ${fadeOutOldPair ? styles.fadeOut : ''}`}>
+            {visiblePair.aiIsIndicator || !visiblePair.aiText ? (
+              requestStartTimeRef.current ? (
+                <div className={styles.loadingContainer}>
+                  <div className={styles.loadingDots}>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                  </div>
+                  <div className={styles.timer}>
+                    {((Date.now() - requestStartTimeRef.current) / 1000).toFixed(1)}s
+                  </div>
+                </div>
+              ) : null
+            ) : (
+              <>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {visiblePair.aiText}
+                </ReactMarkdown>
+                {visiblePair.aiDuration > 0 && (
+                  <div className={styles.timer}>
+                    {visiblePair.aiDuration.toFixed(1)}s
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {error && (
             <div className={styles.errorMessage}>
               <span>{error.message}</span>
