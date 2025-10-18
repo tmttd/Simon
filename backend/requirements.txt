@@ -3,6 +3,7 @@ Django==5.2.4
 django-cors-headers==4.7.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
+adrf==0.1.10  # Async Django REST Framework
 uvicorn==0.34.3
 gunicorn==23.0.0
 
