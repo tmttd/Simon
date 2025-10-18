@@ -101,6 +101,10 @@ TEMPLATES = [
     },
 ]
 
+# ASGI 설정: 비동기 서버(Uvicorn)에서 사용
+ASGI_APPLICATION = 'config.asgi.application'
+
+# (참고) 기존 WSGI 설정은 남겨도 무방하지만, ASGI 전환을 위해 주 사용 진입점은 ASGI입니다.
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
@@ -115,6 +119,12 @@ DATABASES = {
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
         'HOST': os.environ.get('POSTGRES_HOST'),
         'PORT': os.environ.get('POSTGRES_PORT'),
+        # 비동기 최적화: DB 연결 풀 설정
+        'CONN_MAX_AGE': 600,  # 연결을 10분간 재사용 (매번 새 연결 생성 방지)
+        'CONN_HEALTH_CHECKS': True,  # 연결 상태 자동 체크
+        'OPTIONS': {
+            'connect_timeout': 10,  # 연결 타임아웃 10초
+        }
     }
 }
 
