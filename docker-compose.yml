@@ -14,15 +14,15 @@ services:
       retries: 5
     # 1vCPU / 2GB 최적화: PostgreSQL 리소스 제한
     environment:
-      POSTGRES_INITDB_ARGS: "-c shared_buffers=64MB -c max_connections=30 -c work_mem=4MB"
+      POSTGRES_INITDB_ARGS: "-c shared_buffers=128MB -c max_connections=100 -c work_mem=2MB"
     deploy:
       resources:
         limits:
-          cpus: '0.2'
-          memory: 256M
+          cpus: '0.3'
+          memory: 512M
         reservations:
           cpus: '0.1'
-          memory: 128M
+          memory: 256M
 
   backend:
     build:
