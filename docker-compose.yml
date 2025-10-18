@@ -12,6 +12,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # 1vCPU / 2GB 최적화: PostgreSQL 리소스 제한
+    environment:
+      POSTGRES_INITDB_ARGS: "-c shared_buffers=64MB -c max_connections=30 -c work_mem=4MB"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   backend:
     build:
@@ -21,11 +32,13 @@ services:
       - ./backend/.env
 
     command: >
-      gunicorn config.wsgi:application
-        --bind 0.0.0.0:8000
+      uvicorn config.asgi:application
+        --host 0.0.0.0
+        --port 8000
         --workers 2
-        --threads 2
-        --timeout 180
+        --limit-concurrency 80
+        --timeout-keep-alive 300
+        --backlog 1024
     volumes:
       - ./backend:/app
     ports:
@@ -34,6 +47,15 @@ services:
       db:
         condition: service_healthy
     restart: always
+    # 1vCPU / 2GB 최적화: Backend 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
+          memory: 1536M
+        reservations:
+          cpus: '0.3'
+          memory: 768M
 
   frontend:
     build:
@@ -52,6 +74,15 @@ services:
     depends_on:
       - backend
     restart: always
+    # 1vCPU / 2GB 최적화: Nginx 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
 
 volumes:
   postgres_data:
