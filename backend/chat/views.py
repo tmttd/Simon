@@ -66,9 +66,14 @@ class ChatAgentView(APIView):
             # 첫 턴에 업로드된 파일 있으면 바이트 리스트로 수집
             files = None
             if is_first_turn:
+                # ADRF는 request.FILES를 안전하게 접근 가능
                 upload_list = request.FILES.getlist('files')
                 if upload_list:
-                    files = [f.read() for f in upload_list]
+                    # 각 파일을 비동기로 읽기 (I/O 작업)
+                    files = []
+                    for f in upload_list:
+                        file_bytes = await sync_to_async(f.read)()
+                        files.append(file_bytes)
 
             # 사용자 메시지 저장 (비동기)
             await sync_to_async(ChatMessage.objects.create)(
@@ -99,6 +104,9 @@ class ChatAgentView(APIView):
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"ChatAgentView Error: {error_trace}")  # 디버깅용 로그
             return Response(
                 {'error': f'서버 내부 오류: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -167,9 +175,11 @@ class Simon_InitialClassiferView(APIView):
             note_text = request.data.get('note_text', '')
             files = request.FILES.getlist('files')
 
+            # 파일을 비동기로 읽기
             file_bytes_list = []
             for f in files:
-                file_bytes_list.append(f.read())
+                file_bytes = await sync_to_async(f.read)()
+                file_bytes_list.append(file_bytes)
 
             # 1) 세션/스레드 생성 (비동기)
             session = await sync_to_async(StudySession.objects.create)(user=request.user, title='학습 세션')
